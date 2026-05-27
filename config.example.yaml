@@ -46,7 +46,6 @@ user_profile:
     - SF
     - NYC
     - Remote-US
-  linkedin_url: "https://www.linkedin.com/in/yourprofile"
   cta: "Would love a 15-min chat"
 
 models:

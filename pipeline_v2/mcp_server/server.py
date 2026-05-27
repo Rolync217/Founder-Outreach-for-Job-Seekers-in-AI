@@ -15,6 +15,7 @@ Recommended agent pattern:
 
 from mcp.server.fastmcp import FastMCP
 
+from tools.export import export as _export
 from pipeline_v2.mcp_server.tools.scrape_yc_algolia_v2 import scrape_yc_algolia
 from pipeline_v2.mcp_server.tools.recon_v2 import recon
 from pipeline_v2.mcp_server.tools.linkdapi_v2 import (
@@ -266,6 +267,21 @@ def check_hiring_signals(
         company_name=company_name,
     )
     return result.to_dict()
+
+
+@mcp.tool()
+def export_to_excel(output_path: str | None = None) -> str:
+    """Export the full pipeline database to a multi-sheet Excel file.
+
+    Writes four sheets: Companies, Scores, Outreach Drafts, Research.
+    Saves to reports/outreach_export_<timestamp>.xlsx by default.
+
+    Args:
+        output_path: Optional custom file path for the export.
+
+    Returns the path of the written file.
+    """
+    return _export(output_path=output_path)
 
 
 if __name__ == "__main__":

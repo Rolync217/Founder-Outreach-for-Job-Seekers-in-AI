@@ -1,6 +1,6 @@
 # Outreach Pipeline
 
-An autonomous job search pipeline built on LangGraph. It sources early-stage AI companies, researches each one, scores your fit, and drafts personalized cold outreach — then runs on a schedule or responds interactively through Claude Code or Claude Desktop.
+A research and drafting pipeline for founder outreach. It finds early-stage AI companies, reads their product and hiring signals, scores your fit, and writes a personalized message — then runs on a schedule or responds interactively through Claude Code or Claude Desktop. You review and send.
 
 ## What it does
 
@@ -52,6 +52,28 @@ pip install -r requirements.txt
 playwright install chromium
 python tools/migrate.py
 ```
+
+---
+
+## Viewing your data
+
+**Export to Excel:**
+```bash
+python tools/export.py
+# writes reports/outreach_export_<timestamp>.xlsx
+# Sheets: Companies · Scores · Outreach Drafts · Research
+```
+
+**Connect directly with a Postgres client:**
+
+Point any client (TablePlus, DBeaver, psql) at your `DATABASE_URL`. Key tables:
+
+| Table | Contents |
+|---|---|
+| `companies_v2` | every sourced company |
+| `scoring_v2` | fit scores across 6 dimensions |
+| `outreach_v2` | drafted messages |
+| `research_v2` | product, hiring signals, founder info |
 
 ---
 

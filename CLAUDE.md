@@ -1,6 +1,6 @@
 # Outreach Pipeline — Claude Code Instructions
 
-This is an autonomous job search pipeline built on LangGraph. It sources early-stage AI companies, researches them, scores fit across six dimensions, and drafts personalized cold outreach messages. It runs on a schedule (`scheduler.py`) or as an MCP server for interactive use with Claude Desktop.
+This is a research and drafting pipeline for founder outreach. It finds early-stage AI companies, reads their product and hiring signals, scores fit across six dimensions, and drafts personalized outreach messages. The user reviews and sends — there is no automated send layer. Runs on a schedule (`scheduler.py`) or as an MCP server for interactive use with Claude Desktop.
 
 ---
 
@@ -14,7 +14,6 @@ Ask the user for:
 - Full name
 - One-sentence background (what they build, their expertise)
 - Target role (e.g. "Founding Engineer", "AI Engineer")
-- LinkedIn profile URL
 - Target cities (e.g. SF, NYC, Remote-US)
 
 ### Step 2 — config.yaml
