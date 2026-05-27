@@ -1,0 +1,102 @@
+sourcing:
+  pool_sufficient_threshold: 35
+  consecutive_low_quality_limit: 5
+  light_run_source_categories:
+    - startup_discovery
+    - founder_hiring_signal
+    - direct_hiring
+
+research:
+  max_iterations:
+    daily_light: 4
+    deep_run: 8
+  consecutive_no_progress_threshold:
+    daily_light: 2
+    deep_run: 3
+  dimension_priority:
+    - product_understanding
+    - work_alignment
+    - hiring_signal
+    - founder_background
+    - company_stage_and_size
+  critical_dimensions:
+    - product_understanding
+    - work_alignment
+  opus_checkpoint_interval:
+    daily_light: 3
+    deep_run: 3
+  early_exit_conditions:
+    - condition: tier1_evidence_found
+      description: If a Tier 1 hiring signal is found AND product_understanding + work_alignment are sufficient, exit research loop early.
+
+daily_target:
+  daily_light: 15
+  deep_run: 20
+
+cost_hard_cap_usd: 20.0
+
+hiring_tiers:
+  tier1:
+    label: Active hiring
+    signals:
+      - founder_personal_hiring_post
+      - job_posted_relevant_role_30d
+      - direct_hiring_confirmation
+  tier2:
+    label: Likely hiring soon
+    signals:
+      - funding_raised_90d
+      - headcount_growing
+      - job_posted_not_exact_match
+      - yc_batch_recent
+  tier3:
+    label: Watchlist
+    description: Strong fit, no current hiring signals.
+  tier4:
+    label: Not active
+    description: No signals, last activity >90 days.
+
+scoring:
+  weights:
+    hiring: 4
+    traction: 2
+    founder: 2
+    product: 2
+    alignment: 2
+    recency: 1
+  tier_thresholds:
+    tier_1_pct: 0.72
+    tier_2_pct: 0.48
+    tier_3_pct: 0.28
+  dimension_guidance:
+    hiring: >
+      strong = founder posted personally about hiring for a relevant ML/AI/backend role in last 30 days,
+      OR confirmed job description found for relevant role posted <=30d.
+      good = job posted >30d but <=90d, OR indirect confirmation (e.g. headcount grew 20%+).
+      weak = older signal, vague mention, not directly relevant to the candidate's stack.
+      missing = no evidence of active hiring found.
+    founder: >
+      strong = confirmed founder with ML/AI/infrastructure background, prior tier-1 company, LinkedIn verified.
+      good = confirmed founder, plausible background but less relevant or less verified.
+      weak = founder identified but low confidence or non-technical.
+      missing = could not identify any founder.
+    product: >
+      strong = live product with paying customers, clear revenue signal.
+      good = live product, unclear if paying; or paying but early.
+      weak = demo/beta only, no clear revenue.
+      missing = no product evidence found.
+    traction: >
+      strong = concrete metrics — $Xk MRR, Y users, Z% growth.
+      good = qualitative traction — design partners, pilots, waitlist.
+      weak = claimed traction without evidence.
+      missing = no traction data found.
+    recency: >
+      strong = funding or major news in last 90d, OR active hiring right now.
+      good = funding 90-180d ago, or moderate recent activity.
+      weak = last activity 6-12 months ago.
+      missing = no recent activity found, or company appears inactive.
+    alignment: >
+      strong = role involves LLM/agentic AI infrastructure, ML pipelines, or backend systems user has shipped.
+      good = adjacent work — AI product engineering, data infrastructure, relevant stack.
+      weak = tangential — some AI but mostly different domain.
+      missing = no alignment signal found.

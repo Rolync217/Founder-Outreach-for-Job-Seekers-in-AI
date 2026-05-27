@@ -1,0 +1,1311 @@
+version: 1
+
+# ─────────────────────────────────────────────────────────────
+# GLOBAL CONFIGURATION
+# ─────────────────────────────────────────────────────────────
+
+global:
+
+  recency_thresholds:
+    very_fresh: 7       # days — founder posts, community posts, launches
+    fresh: 30           # days — job listings, funding news
+    recent: 90          # days — funding rounds, batch completion
+    stale: 180          # days — portfolio pages, old profiles
+    expired: 365        # days — treat as unreliable without corroboration
+
+  cost_tiers:
+    low: 0.00           # free or negligible
+    medium: 0.01        # $0.01-0.05 per lookup
+    high: 0.05          # >$0.05 per lookup
+
+  # ── Source priority ranking ────────────────────────────────
+  # Global default ordering. When multiple sources can fill
+  # the same dimension at the same cost tier, prefer sources
+  # higher in this list. Lower number = higher priority.
+  # Individual sources do NOT carry their own priority field —
+  # this is the single source of truth for ordering.
+
+  source_priority_ranking:
+    founder_posts: 1
+    ats_boards: 2
+    careers_page: 3
+    linkedin_jobs: 4
+    wellfound: 5
+    community_hiring_platforms: 6
+    yc_directory: 7
+    product_hunt: 8
+    vc_portfolio_pages: 9
+    accelerator_directories: 10
+    funding_news: 11
+    web_search_general: 12
+
+  # ── Dimension-specific priority overrides ──────────────────
+  # When the research node is filling a specific dimension,
+  # use this ordering instead of the global default.
+  # This allows the best source per dimension to be selected
+  # even if it ranks low globally.
+
+  dimension_priority_overrides:
+
+    hiring_signal:
+      - founder_posts              # definitive — always first
+      - ats_boards                 # strong, cheap
+      - careers_page               # strong, free
+      - community_hiring_platforms # strong, early signal
+      - linkedin_jobs              # medium, fallback
+      - wellfound                  # medium, discovery
+      - yc_directory               # medium, hiring flag only
+      - funding_news               # weak, indirect signal
+      - web_search_general         # last resort
+
+    product_understanding:
+      - company_website            # primary, free, high trust
+      - careers_page               # secondary — JDs reveal real work
+      - product_hunt               # strong launch descriptions
+      - yc_directory               # partial, often clearer than website
+      - wellfound                  # partial, company profiles
+      - community_hiring_platforms # partial, plain language posts
+      - web_search_general         # last resort
+
+    company_stage_and_size:
+      - crunchbase_via_tavily      # primary, structured, high trust
+      - funding_news               # strong for recent rounds
+      - yc_directory               # partial, batch and team size
+      - vc_portfolio_pages         # confirms VC backing
+      - accelerator_directories    # implies pre-seed/seed
+      - product_hunt               # weak, launch implies early stage
+      - web_search_general         # last resort
+
+    founder_background:
+      - founder_linkedin_profile   # primary, can reach sufficient alone
+      - founder_posts              # partial — reveals role and values
+      - yc_directory               # fallback for founder name extraction (founder_names field)
+      - product_hunt               # fallback for founder name extraction (maker_name field)
+      - company_website            # fallback for founder name extraction (team_page_names field)
+      - web_search_general         # last resort for both name and background
+
+    work_alignment:
+      - company_website            # primary — product and customer info
+      - careers_page               # secondary — JDs show actual day-to-day work
+      - product_hunt               # partial — launch descriptions
+      - web_search_general         # last resort
+
+  # ── Sourcing stop conditions ───────────────────────────────
+  # The sourcing node reads these to decide when to stop
+  # searching for more candidates.
+
+  sourcing_stop_conditions:
+    target_pool_size:
+      daily_light: 30
+      deep_run: 50
+    max_sourcing_iterations: 15
+    consecutive_low_quality_limit: 5
+
+    # ── Dimension coverage diversity ────────────────────────
+    # Instead of requiring N distinct source categories,
+    # require that the candidate pool has meaningful coverage
+    # across these critical dimensions before stopping.
+    # This prevents a pool full of companies from discovery
+    # sources with zero hiring signal coverage.
+    minimum_dimension_coverage:
+      required_before_stop:
+        - hiring_signal
+        - product_understanding
+      # Pool must contain at least some companies sourced from
+      # sources that support each of these dimensions.
+      # If the pool has 30 companies but none came from a source
+      # that supports hiring_signal (e.g., all from yc_directory
+      # or vc_portfolio_pages), sourcing must continue from a
+      # hiring-signal source before stopping.
+      minimum_companies_per_dimension: 5
+      # At least 5 companies in the pool must have come from
+      # sources that support hiring_signal, and at least 5
+      # from sources that support product_understanding.
+    rule: >
+      Before stopping, check: does the pool contain at least
+      minimum_companies_per_dimension companies from sources
+      whose signal_types_supported includes each dimension
+      listed in required_before_stop? If not, continue sourcing
+      from sources that cover the missing dimension. If all
+      such sources are exhausted, stop anyway and log the
+      dimension coverage gap.
+
+  # ── Dimension completion criteria ─────────────────────────
+  # Defines when the research loop should consider each
+  # dimension "sufficient" and stop seeking more data.
+  # The research node checks these criteria after every fetch.
+
+  dimension_completion_criteria:
+
+    hiring_signal:
+      sufficient_when:
+        - "At least one signal with hiring_signal_strength >= strong from a source with confidence_weight >= medium"
+        - "OR at least two independent signals with hiring_signal_strength >= medium from different sources"
+        - "OR one definitive signal (founder_post) regardless of source count"
+      partial_when:
+        - "Only weak signals found (e.g., funding_news, indirect mentions)"
+        - "OR one medium signal with no corroboration"
+      remains_unknown_when:
+        - "No hiring-related evidence found from any source"
+
+    product_understanding:
+      sufficient_when:
+        - "Can answer all three: what the product does, who uses it, and how it works — in concrete terms not marketing language"
+        - "At least one source with confidence_weight >= high contributed"
+      partial_when:
+        - "Can answer what the product does but not who uses it or how it works"
+        - "OR only marketing language available, no concrete product details"
+      remains_unknown_when:
+        - "No product information found from any source"
+
+    founder_background:
+      sufficient_when:
+        - "At least one founder identified by name with previous company or relevant background known"
+        - "Source must have confidence_weight >= medium"
+      partial_when:
+        - "Founder name known but no background details"
+        - "OR background found but from a low confidence_weight source only"
+      remains_unknown_when:
+        - "No founder name identified from any source"
+      missing_name_fallback:
+        - "If founder name is not available from the source that discovered the company, attempt extraction from: yc_directory (founder_names field), product_hunt (maker_name field), company_website (team_page_names field), web_search_general ('[company name] founder CEO') — in that order"
+        - "Only skip founder_background entirely if all fallback sources have been tried and none returned a name"
+
+    work_alignment:
+      sufficient_when:
+        - "Can determine the work_type category with confidence"
+        - "Can describe what the candidate would work on day to day in concrete terms"
+        - "At least one source with confidence_weight >= high contributed"
+      partial_when:
+        - "Work type category is clear but day-to-day work description is vague"
+        - "OR assessment is based only on low confidence_weight sources"
+      remains_unknown_when:
+        - "No information about product type, customer type, or engineering work available"
+
+    company_stage_and_size:
+      sufficient_when:
+        - "Funding stage known (pre-seed/seed/series A etc.) AND at least one of: funding amount, employee count, or investor names known"
+        - "At least one source with confidence_weight >= medium contributed"
+      partial_when:
+        - "Only one of stage/amount/employee count known"
+        - "OR information only from low confidence_weight sources"
+      remains_unknown_when:
+        - "No funding or company size information found from any source"
+
+  # ── Contradiction resolution rules ────────────────────────
+  # When two sources provide conflicting information about
+  # the same dimension, use these rules to resolve.
+
+  contradiction_resolution:
+    rules:
+      - rule: trust_level_wins
+        description: >
+          When two sources contradict on the same fact,
+          prefer the source with higher trust_level.
+          high > medium > low.
+          Example: company_website says "Series A" but
+          funding_news says "Seed" — trust company_website
+          (trust_level: high) over funding_news (trust_level: medium).
+
+      - rule: confidence_weight_wins
+        description: >
+          When trust_level is equal between conflicting sources,
+          prefer the source with higher confidence_weight.
+          high > medium > low.
+
+      - rule: recency_wins
+        description: >
+          When both trust_level and confidence_weight are equal,
+          prefer the more recent evidence. Use signal_recency_days
+          or evidence timestamp to determine which is newer.
+          Newer evidence overrides older evidence.
+          Example: a Crunchbase profile says 15 employees but a
+          3-day-old funding article says 25 — prefer the article
+          because it is more recent, even though both are
+          trust_level: medium.
+
+      - rule: surface_unresolvable_conflicts
+        description: >
+          If contradicting sources have equal trust_level,
+          equal confidence_weight, and similar recency —
+          do not silently pick one. Surface the contradiction
+          in the knowledge_state ambiguities field and let
+          the supervisor decide. Mark the dimension as partial
+          with gap_reason: contradictory_evidence.
+
+    application_order:
+      - trust_level_wins
+      - confidence_weight_wins
+      - recency_wins
+      - surface_unresolvable_conflicts
+
+  # ── Early exit rules ──────────────────────────────────────
+  # When strong evidence is found early in the research loop,
+  # the agent can stop further research for that company
+  # instead of exhausting all iterations.
+
+  early_exit_rules:
+    conditions:
+      - name: strong_hire_with_understanding
+        description: >
+          If a definitive hiring signal is found (founder_post
+          or any signal with hiring_signal_strength: definitive)
+          AND product_understanding status is sufficient
+          AND work_alignment status is sufficient —
+          stop the research loop immediately. There is no
+          value in additional research iterations. Assign
+          Tier 1 and proceed to leverage matching.
+        triggers:
+          hiring_signal_strength: definitive
+          product_understanding: sufficient
+          work_alignment: sufficient
+        action: exit_loop_assign_tier_1
+
+      - name: strong_hire_partial_understanding
+        description: >
+          If a definitive hiring signal is found but
+          product_understanding or work_alignment are only
+          partial — do NOT early exit. Continue research
+          to fill the partial dimensions because leverage
+          matching needs product understanding and work
+          alignment to produce a credible message.
+        triggers:
+          hiring_signal_strength: definitive
+          product_understanding: partial
+        action: continue_research
+
+      - name: all_critical_sufficient_no_hire
+        description: >
+          If product_understanding and work_alignment are
+          both sufficient but no hiring signal found —
+          do NOT early exit. Continue research focused
+          on hiring_signal dimension only. A company with
+          great fit but no hiring signal goes to Tier 3
+          watchlist, which is still valuable output.
+        triggers:
+          product_understanding: sufficient
+          work_alignment: sufficient
+          hiring_signal: unknown
+        action: continue_research_hiring_only
+
+    rule: >
+      Check early exit conditions after every fetch iteration.
+      Only the first condition (strong_hire_with_understanding)
+      triggers an actual early exit. The other conditions are
+      documented here to make explicit that partial understanding
+      with a definitive signal does NOT warrant early exit.
+
+  # ── Cost preference rule ──────────────────────────────────
+  # Explicit rule for source selection when multiple sources
+  # can satisfy the same dimension.
+
+  cost_preference_rule: >
+    When the research node selects a source for a dimension,
+    it must apply this selection order:
+    1. Filter to sources whose signal_types_supported includes
+       the target dimension and that have not been fetched yet
+    2. Sort by cost_tier ascending (low → medium → high)
+    3. Within the same cost_tier, sort by the dimension-specific
+       priority from dimension_priority_overrides
+    4. Within the same cost_tier and priority, prefer sources
+       with higher confidence_weight
+    5. Select the top result
+
+    This ensures the cheapest credible source is always tried
+    first. An expensive source is only used when all cheaper
+    sources for that dimension have been tried or are unavailable.
+    The research node must never call a high cost_tier source
+    when an untried low cost_tier source covers the same dimension.
+
+  # ── Poster classification rule ─────────────────────────────
+  # When the sourcing or research node finds a hiring post,
+  # classify it based on the poster's role. This determines
+  # which source the signal is attributed to and what
+  # hiring_signal_strength applies.
+
+  poster_classification:
+    founder_roles:
+      - Founder
+      - Co-Founder
+      - Co-founder
+      - CEO
+      - CTO
+      - Chief Executive Officer
+      - Chief Technology Officer
+      - Chief Product Officer
+      - CPO
+    rule: >
+      If poster_role matches any value in founder_roles
+      (case-insensitive), classify the post under
+      founder_posts with hiring_signal_strength: definitive.
+      If poster_role does not match — classify under
+      community_hiring_platforms with
+      hiring_signal_strength: strong (not definitive).
+      This distinction matters for Tier 1 assignment:
+      only founder_posts qualify for automatic Tier 1.
+
+  # ── Entity validation rules ────────────────────────────────
+  # These map directly to entity_validator.py reject patterns.
+
+  entity_validation_rules:
+    reject_categories:
+      - article_title
+      - fund_or_investor_page
+      - category_or_list_page
+      - malformed_entity
+      - non_company_org
+      - duplicate_entity
+      - stale_entity
+
+  # ── Work alignment criteria ────────────────────────────────
+  # Read by the research node when assessing work_alignment
+  # dimension. Defines what kind of companies and engineering
+  # work the candidate is actually looking for.
+  # This is not a filter — it is context for the agent to
+  # reason about fit. Hard exclusions are enforced by Python.
+
+  work_alignment_criteria:
+
+    strongly_preferred:
+      description: >
+        Company's core product is an AI agent or multi-agent
+        system solving a real problem for end users or
+        businesses. The engineering work involves designing
+        agent behavior, tool use, evaluation, reliability,
+        and user-facing product features. Agent IS the product.
+      signals:
+        - product description centers on autonomous AI doing work
+        - company describes their product as an agent or assistant
+        - core value prop is "AI does X for you" not "AI helps you do X"
+        - engineering roles mention agent frameworks, tool use,
+          evaluation, or reliability of autonomous systems
+
+    preferred:
+      description: >
+        Company is making an existing workflow agentic.
+        Traditional software product adding meaningful
+        agent capabilities. Engineering work involves
+        building the agent layer, not just calling an LLM.
+      signals:
+        - established product category adding AI automation
+        - workflow automation with AI decision-making
+        - replacing human steps in a process with agents
+        - engineering roles mention orchestration, automation,
+          or AI-powered workflows
+
+    acceptable:
+      description: >
+        Applied AI product that uses AI meaningfully but
+        not primarily agent-based. B2B SaaS with real AI
+        at the core. Work would still involve building
+        AI-powered features for end users.
+      signals:
+        - AI meaningfully changes the product experience
+        - not just a thin wrapper around an LLM API
+        - engineering involves real product work not infra
+
+    excluded:
+      # These are hard exclusions — Python filters these
+      # before research runs. Agent should not spend time
+      # on companies matching any of these categories.
+      - crypto
+      - blockchain
+      - web3
+      - GPU optimization
+      - model training infrastructure
+      - inference optimization
+      - vector databases as core product
+      - MLOps platforms
+      - LLM evaluation frameworks sold as a product
+      - developer APIs where end users are other developers
+      - AI safety research organizations
+      - foundation model companies
+
+    assessment_rule: >
+      When assessing work_alignment for a company, the question
+      is not "does this company use AI" — it is "would the
+      candidate be building agent behavior and product features,
+      or would they be building infrastructure that other people use."
+      An infra company is NOT automatically excluded if the actual
+      engineering work involves building product-like experiences
+      on top of that infra. Assess the day-to-day work, not the
+      category label.
+
+# ─────────────────────────────────────────────────────────────
+# SOURCES
+# ─────────────────────────────────────────────────────────────
+
+sources:
+
+  # ─────────────────────────────────────────────────────────────
+  # FOUNDER HIRING SIGNAL
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: founder_posts
+    source_category: founder_hiring_signal
+    enabled: true
+    purpose:
+      - detect_direct_hiring_from_founder
+      - extract_founder_voice_and_values
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions:
+      - founder_background
+    signal_types_supported:
+      - hiring_signal
+      - founder_background
+    trust_level: high
+    entity_quality: high
+    freshness_quality: very_high
+    hiring_signal_strength: definitive
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: medium
+    enrichment_needed_from:
+      - company_website
+    fallback_on_failure:
+      - careers_page
+      - ats_boards
+    recency_rule: >
+      Only consider posts within very_fresh (7 days) for Tier 1.
+      Posts within fresh (30 days) are still strong.
+      Posts older than fresh (30 days) should be ignored.
+    when_to_use: >
+      Highest priority source for hiring_signal. A founder
+      personally posting they are hiring is always Tier 1
+      regardless of any other signal. Search via Tavily for
+      recent LinkedIn or Twitter posts from founders or CTOs
+      mentioning hiring. Also provides partial founder_background
+      since the post reveals the poster's role and sometimes
+      their priorities and values. Extract their exact language
+      about what they want in a hire — this feeds directly
+      into the outreach draft as the strongest possible hook.
+      Classification: only posts where poster_role matches
+      global.poster_classification.founder_roles belong here.
+      All other hiring posts go to community_hiring_platforms.
+    when_not_to_use: >
+      Ignore recruiter posts, generic reposts without personal
+      context, and posts older than 30 days. Do not use for
+      product_understanding or work_alignment — a hiring post
+      tells you they are hiring, not what the product does.
+      If the post is from a non-founder employee, reclassify
+      to community_hiring_platforms — do not keep it here.
+    common_failure_modes:
+      - recruiter_post_attributed_to_company     # maps to: malformed_entity
+      - repost_without_original_context           # maps to: malformed_entity
+      - vague_announcement_without_specific_role  # maps to: malformed_entity
+      - post_older_than_30_days_still_indexed     # maps to: stale_entity
+    extract_fields:
+      - company_name
+      - poster_name
+      - poster_role
+      - role_mentioned
+      - urgency_signals
+      - what_they_value_in_candidates
+      - post_text
+      - post_age_days
+      - reaction_count
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # DIRECT HIRING SOURCES
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: ats_boards
+    source_category: direct_hiring
+    enabled: true
+    purpose:
+      - confirm_active_hiring
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions: []
+    signal_types_supported:
+      - hiring_signal
+    trust_level: high
+    entity_quality: high
+    freshness_quality: high
+    hiring_signal_strength: strong
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: low
+    enrichment_needed_from: []
+    fallback_on_failure:
+      - linkedin_jobs
+      - wellfound
+    recency_rule: >
+      Job listings within fresh (30 days) are strong evidence.
+      Listings older than recent (90 days) are weak — company
+      may have filled the role and not removed the listing.
+    when_to_use: >
+      Use when careers_page returned nothing or does not exist.
+      Search Greenhouse, Lever, and Ashby boards via Tavily
+      using the company name. If a matching ATS board is found
+      with relevant roles, this is strong Tier 1 or Tier 2
+      hiring evidence. Prefer this over linkedin_jobs because
+      ATS data is more current and trustworthy.
+    when_not_to_use: >
+      Do not use for any dimension other than hiring_signal.
+      If company name is common or ambiguous, verify the ATS
+      board belongs to the correct company before trusting it.
+    common_failure_modes:
+      - company_name_slug_mismatch_on_ats_url    # maps to: malformed_entity
+      - wrong_company_with_similar_name           # maps to: malformed_entity
+      - stale_listings_not_removed                # maps to: stale_entity
+    extract_fields:
+      - role_title
+      - job_description
+      - location
+      - posting_date_if_visible
+      - source_url
+
+  - source_name: careers_page
+    source_category: direct_hiring
+    enabled: true
+    purpose:
+      - confirm_active_hiring
+      - understand_engineering_work
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions:
+      - work_alignment
+      - product_understanding
+    signal_types_supported:
+      - hiring_signal
+      - work_alignment
+      - product_understanding
+    trust_level: high
+    entity_quality: high
+    freshness_quality: high
+    hiring_signal_strength: strong
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: low
+    enrichment_needed_from: []
+    fallback_on_failure:
+      - ats_boards
+      - linkedin_jobs
+    recency_rule: >
+      Careers pages are assumed current unless posting dates
+      are visible and older than fresh (30 days).
+    when_to_use: >
+      Use when hiring_signal is unknown or partial and you
+      already have the company website URL. Check /careers,
+      /jobs, or linked ATS pages. Job descriptions often
+      reveal what the company actually builds, what tech
+      stack they use, and what kind of work you would do
+      day to day — making this a useful secondary source
+      for work_alignment and partial product_understanding.
+      If roles matching the candidate's profile are posted,
+      hiring_signal can reach sufficient from this source alone.
+    when_not_to_use: >
+      Do not use for founder_background or company_stage_and_size.
+      Absence of a careers page does not mean not hiring.
+      Do not treat generic operations or marketing roles as
+      relevant hiring signal for engineering outreach.
+    common_failure_modes:
+      - no_careers_page_exists                      # empty result, not rejection
+      - only_generic_roles_not_engineering           # maps to: malformed_entity
+      - roles_posted_months_ago_still_listed         # maps to: stale_entity
+      - job_description_is_copy_paste_template       # low signal, not rejection
+    extract_fields:
+      - role_title
+      - role_description
+      - tech_stack_mentioned
+      - product_details_from_jd
+      - location
+      - posting_date_if_visible
+      - source_url
+
+  - source_name: linkedin_jobs
+    source_category: direct_hiring
+    enabled: true
+    purpose:
+      - confirm_active_hiring
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions: []
+    signal_types_supported:
+      - hiring_signal
+    trust_level: medium
+    entity_quality: medium
+    freshness_quality: high
+    hiring_signal_strength: medium
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: medium
+    enrichment_needed_from:
+      - company_website
+    fallback_on_failure:
+      - wellfound
+      - community_hiring_platforms
+    recency_rule: >
+      LinkedIn listings within fresh (30 days) are medium
+      evidence. Listings older than fresh are unreliable.
+    when_to_use: >
+      Use as a fallback when careers_page and ats_boards both
+      returned no results. A LinkedIn job listing alone is
+      Tier 2 evidence, not Tier 1 — always try to corroborate
+      with careers_page or ats_boards first.
+    when_not_to_use: >
+      Do not use as primary hiring confirmation. Do not use
+      for product_understanding, founder_background, or
+      work_alignment. If careers_page or ats_boards already
+      confirmed hiring, skip this source to save cost.
+    common_failure_modes:
+      - duplicate_roles_from_aggregators              # maps to: duplicate_entity
+      - stale_listings_still_indexed                  # maps to: stale_entity
+      - third_party_recruiter_posts_not_from_company  # maps to: malformed_entity
+    extract_fields:
+      - role_title
+      - company_name
+      - location
+      - posting_date_if_visible
+      - source_url
+
+  - source_name: wellfound
+    source_category: startup_hiring
+    enabled: true
+    purpose:
+      - discover_startups_hiring
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions:
+      - product_understanding
+    signal_types_supported:
+      - hiring_signal
+      - product_understanding
+    trust_level: medium
+    entity_quality: medium
+    freshness_quality: medium
+    hiring_signal_strength: medium
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: medium
+    enrichment_needed_from:
+      - company_website
+    fallback_on_failure:
+      - community_hiring_platforms
+      - web_search_general
+    recency_rule: >
+      Wellfound profiles have no reliable posted date.
+      Treat all listings as recent (90 day) evidence
+      unless other sources contradict.
+    when_to_use: >
+      Use during sourcing to discover early-stage startups
+      that are actively hiring. Also provides partial
+      product_understanding. Use during research when
+      hiring_signal is partial and other hiring sources
+      returned nothing.
+    when_not_to_use: >
+      Profiles can be outdated. Do not treat a Wellfound
+      listing as strong hiring confirmation on its own.
+      Do not use for founder_background or company_stage_and_size.
+    common_failure_modes:
+      - outdated_profiles_with_filled_roles  # maps to: stale_entity
+      - incomplete_company_descriptions       # low signal, not rejection
+      - roles_not_updated_for_months          # maps to: stale_entity
+    extract_fields:
+      - company_name
+      - role_title
+      - company_description
+      - team_size_if_visible
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # COMMUNITY HIRING PLATFORMS
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: community_hiring_platforms
+    source_category: community_hiring
+    enabled: true
+    purpose:
+      - detect_early_hiring_signals
+      - discover_startups_before_ats
+    primary_dimensions:
+      - hiring_signal
+    secondary_dimensions:
+      - product_understanding
+    signal_types_supported:
+      - hiring_signal
+      - product_understanding
+    trust_level: medium
+    entity_quality: medium
+    freshness_quality: very_high
+    hiring_signal_strength: strong
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+      - founder_linkedin_profile
+    fallback_on_failure:
+      - linkedin_jobs
+      - web_search_general
+    recency_rule: >
+      Community posts are extremely time-sensitive. Only
+      consider posts within very_fresh (7 days) as strong
+      signals. Posts within fresh (30 days) are medium.
+      Older posts should be ignored.
+    when_to_use: >
+      Use to detect early hiring signals before companies
+      post on formal ATS boards. Search via Tavily for
+      hiring posts on CoffeeSpace, Slack communities
+      (Elpha, Rands Leadership, MLOps Community, AI
+      Engineers), Discord servers, and Hacker News
+      "Who is Hiring" threads. These platforms often surface
+      roles 1-2 weeks before Greenhouse or LinkedIn. Treat
+      as strong but not definitive. Also provides partial
+      product_understanding since community posts describe
+      what the company does in plain language.
+      Classification: hiring posts where poster_role does NOT
+      match global.poster_classification.founder_roles belong
+      here. Posts from founders/CEOs/CTOs go to founder_posts.
+    when_not_to_use: >
+      Do not treat as definitive hiring confirmation — posts
+      may be exploratory. Do not use for founder_background
+      or company_stage_and_size. Discard posts from anonymous
+      users or without clear company names. Do not confuse
+      co-founder searches with employee hiring.
+    common_failure_modes:
+      - exploratory_post_not_committed_hiring    # maps to: malformed_entity
+      - anonymous_poster_no_company_identified   # maps to: malformed_entity
+      - cofounder_search_not_employee_hiring     # maps to: malformed_entity
+      - post_filled_within_days_now_stale        # maps to: stale_entity
+      - community_spam_or_self_promotion         # maps to: malformed_entity
+    extract_fields:
+      - company_name
+      - poster_name
+      - poster_role
+      - role_mentioned
+      - platform_name
+      - post_text
+      - post_age_days
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # STARTUP DISCOVERY SOURCES
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: yc_directory
+    source_category: startup_discovery
+    enabled: true
+    purpose:
+      - discover_new_startups
+      - understand_product
+      - check_hiring_status
+    primary_dimensions:
+      - product_understanding
+    secondary_dimensions:
+      - hiring_signal
+      - company_stage_and_size
+    signal_types_supported:
+      - product_understanding
+      - hiring_signal
+      - company_stage_and_size
+    trust_level: high
+    entity_quality: high
+    freshness_quality: high
+    hiring_signal_strength: medium
+    signal_confidence_alone: false
+    confidence_weight: high
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+      - founder_linkedin_profile
+    fallback_on_failure:
+      - company_website
+      - product_hunt
+    recency_rule: >
+      YC descriptions are written at batch entry. Companies
+      from batches older than stale (180 days) may have
+      pivoted — always enrich with company_website. Hiring
+      flag has no timestamp — treat as medium evidence.
+    when_to_use: >
+      Primary discovery source. YC company pages include
+      product descriptions, founder names, batch year,
+      team size, and an "actively hiring" flag. Provides
+      partial product_understanding from the YC description.
+      Provides partial hiring_signal from the hiring flag
+      and team size. Use Playwright to apply filters on
+      the directory page before scraping. This is the only
+      source that requires browser-based filter application.
+    when_not_to_use: >
+      Do not rely on YC alone for product_understanding if
+      the company is more than 2 batches old. Do not rely
+      on the hiring flag alone for Tier 1 — corroborate with
+      careers_page or founder_posts.
+    common_failure_modes:
+      - outdated_description_from_batch_entry  # low signal, not rejection
+      - hiring_flag_not_updated                 # maps to: stale_entity
+      - company_pivoted_since_yc_application    # low signal, not rejection
+    extract_fields:
+      - company_name
+      - product_description
+      - founder_names
+      - yc_batch
+      - team_size
+      - hiring_status
+      - location
+      - source_url
+
+  - source_name: product_hunt
+    source_category: startup_discovery
+    enabled: true
+    purpose:
+      - discover_new_startups
+      - understand_product
+      - detect_launch_momentum
+    primary_dimensions:
+      - product_understanding
+    secondary_dimensions:
+      - company_stage_and_size
+    signal_types_supported:
+      - product_understanding
+      - company_stage_and_size
+    trust_level: medium
+    entity_quality: high
+    freshness_quality: very_high
+    hiring_signal_strength: weak
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+      - founder_linkedin_profile
+    fallback_on_failure:
+      - company_website
+      - web_search_general
+    recency_rule: >
+      Launches within very_fresh (7 days) indicate active
+      momentum. Within recent (90 days) still useful for
+      product_understanding. Older than stale (180 days) —
+      product may have pivoted significantly.
+    when_to_use: >
+      Use during sourcing to find recently launched AI
+      products. Launch descriptions explain the product
+      clearly for a general audience. Also useful during
+      research when product_understanding is partial.
+    when_not_to_use: >
+      Not reliable for hiring_signal. Not reliable for
+      founder_background beyond the maker's name. Products
+      launched more than 6 months ago may have pivoted.
+    common_failure_modes:
+      - product_pivoted_since_launch                 # low signal, not rejection
+      - solo_founder_side_project_not_a_company      # maps to: malformed_entity
+      - upvote_count_inflated_by_launch_communities  # low signal, not rejection
+    extract_fields:
+      - company_name
+      - product_description
+      - maker_name
+      - launch_date
+      - upvote_count
+      - product_url
+      - source_url
+
+  - source_name: vc_portfolio_pages
+    source_category: startup_discovery
+    enabled: true
+    purpose:
+      - discover_new_startups
+      - identify_funded_companies
+    primary_dimensions:
+      - company_stage_and_size
+    secondary_dimensions: []
+    signal_types_supported:
+      - company_stage_and_size
+    trust_level: high
+    entity_quality: high
+    freshness_quality: medium
+    hiring_signal_strength: weak
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+      - founder_linkedin_profile
+    fallback_on_failure:
+      - crunchbase_via_tavily
+      - web_search_general
+    recency_rule: >
+      Portfolio pages are static. Assume recent (90 day)
+      quality unless clearly added years ago. Always enrich
+      with company_website to confirm still active.
+    when_to_use: >
+      Use during sourcing in deep_run to discover companies
+      backed by specific VCs. Search via Tavily for portfolio
+      pages from a16z(https://speedrun.a16z.com/companies), Sequoia, Greylock, First Round,
+      Lightspeed, Accel, and other early-stage VCs. Provides
+      partial company_stage_and_size.
+    when_not_to_use: >
+      Portfolio pages are static and often outdated. Do not
+      use for product_understanding or hiring_signal. Filter
+      aggressively during entity validation.
+    common_failure_modes:
+      - portfolio_includes_all_stages  # maps to: category_or_list_page
+      - company_no_longer_active        # maps to: stale_entity
+      - company_name_only_with_no_url   # maps to: malformed_entity
+    extract_fields:
+      - company_name
+      - one_line_description
+      - vc_fund_name
+      - source_url
+
+  - source_name: accelerator_directories
+    source_category: startup_discovery
+    enabled: true
+    purpose:
+      - discover_new_startups
+      - identify_accelerator_backed_companies
+    primary_dimensions:
+      - company_stage_and_size
+    secondary_dimensions: []
+    signal_types_supported:
+      - company_stage_and_size
+    trust_level: medium
+    entity_quality: medium
+    freshness_quality: medium
+    hiring_signal_strength: weak
+    signal_confidence_alone: false
+    confidence_weight: low
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+      - founder_linkedin_profile
+    fallback_on_failure:
+      - web_search_general
+    recency_rule: >
+      Batches older than stale (180 days) are likely
+      irrelevant unless the company has recent activity
+      elsewhere. Batches within recent (90 days) are
+      good discovery signals.
+    when_to_use: >
+      Use during sourcing in deep_run to discover companies
+      from accelerators beyond YC. Search via Tavily for
+      Techstars, 500 Global, South Park Commons,
+      Entrepreneur First, Neo, On Deck, and other
+      AI-focused accelerators. Provides partial
+      company_stage_and_size.
+    when_not_to_use: >
+      Batch descriptions are often the original application
+      pitch. Do not use for product_understanding or
+      hiring_signal. Older batches (2+ years) likely
+      irrelevant.
+    common_failure_modes:
+      - batch_includes_inactive_companies    # maps to: stale_entity
+      - description_from_application         # low signal, not rejection
+      - company_name_changed_since_batch     # maps to: malformed_entity
+    extract_fields:
+      - company_name
+      - batch_name
+      - accelerator_name
+      - cohort_date
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # GROWTH SIGNAL SOURCES
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: funding_news
+    source_category: growth_signal
+    enabled: true
+    purpose:
+      - detect_expansion_signals
+      - discover_new_startups
+    primary_dimensions:
+      - company_stage_and_size
+    secondary_dimensions:
+      - hiring_signal
+    signal_types_supported:
+      - company_stage_and_size
+      - hiring_signal
+    trust_level: medium
+    entity_quality: low
+    freshness_quality: high
+    hiring_signal_strength: weak
+    signal_confidence_alone: false
+    confidence_weight: medium
+    cost_tier: low
+    enrichment_needed_from:
+      - company_website
+    fallback_on_failure:
+      - crunchbase_via_tavily
+      - web_search_general
+    recency_rule: >
+      Funding news within fresh (30 days) is strong for
+      company_stage_and_size. Within recent (90 days)
+      is medium hiring signal. Older than recent is weak.
+    when_to_use: >
+      Use during sourcing to find recently funded companies.
+      During research, use when company_stage_and_size is
+      unknown or partial. Also provides weak hiring_signal.
+      Entity extraction from news articles is unreliable —
+      always validate entity names before adding to pool.
+    when_not_to_use: >
+      Never use to assess product_understanding or
+      work_alignment. Never trust alone for hiring
+      confirmation.
+    common_failure_modes:
+      - article_title_saved_as_company_name     # maps to: article_title
+      - listicle_pages_with_multiple_companies  # maps to: category_or_list_page
+      - press_release_language_not_actual        # low signal, not rejection
+    extract_fields:
+      - company_name
+      - funding_amount
+      - funding_stage
+      - investor_names
+      - date
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # VALIDATION SOURCES
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: company_website
+    source_category: validation
+    enabled: true
+    purpose:
+      - understand_product
+      - identify_customer_type
+      - assess_work_alignment
+    primary_dimensions:
+      - product_understanding
+      - work_alignment
+    secondary_dimensions:
+      - hiring_signal
+    signal_types_supported:
+      - product_understanding
+      - work_alignment
+      - hiring_signal
+    trust_level: high
+    entity_quality: high
+    freshness_quality: medium
+    hiring_signal_strength: weak
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: low
+    enrichment_needed_from: []
+    fallback_on_failure:
+      - product_hunt
+      - yc_directory
+      - web_search_general
+    recency_rule: >
+      Website content is assumed current. If copyright dates
+      are older than stale (180 days) or site appears
+      abandoned, flag as potentially stale.
+    when_to_use: >
+      Always check this source first during research — free,
+      high trust, primary source for product_understanding
+      and work_alignment. Scrape homepage and /about page.
+      Also check for /careers page which provides weak
+      hiring_signal. If the website clearly describes the
+      product, product_understanding can reach sufficient
+      from this source alone.
+    when_not_to_use: >
+      Not reliable for founder_background. Not reliable for
+      company_stage_and_size unless explicitly mentioned.
+      If product_understanding remains partial after scraping,
+      move to another source rather than re-scraping.
+    common_failure_modes:
+      - vague_marketing_copy               # low signal, not rejection
+      - missing_customer_segment_clarity    # low signal, not rejection
+      - javascript_heavy_returning_empty    # technical — try web_search_general
+    extract_fields:
+      - product_description
+      - customer_type
+      - key_features
+      - team_page_names
+      - careers_page_exists
+      - source_url
+
+  - source_name: founder_linkedin_profile
+    source_category: validation
+    enabled: true
+    purpose:
+      - research_founder_background
+      - assess_founder_credibility
+    primary_dimensions:
+      - founder_background
+    secondary_dimensions: []
+    signal_types_supported:
+      - founder_background
+    trust_level: high
+    entity_quality: high
+    freshness_quality: medium
+    hiring_signal_strength: none
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: medium
+    enrichment_needed_from: []
+    fallback_on_failure:
+      - web_search_general
+    recency_rule: >
+      LinkedIn profiles are maintained by the person. No
+      recency threshold. If profile shows the person left
+      the company, treat as contradictory evidence.
+    when_to_use: >
+      Use when founder_background is unknown or partial and
+      you have at least one founder name. Search via Tavily.
+      Primary source for founder_background — can reach
+      sufficient on its own. Essential for leverage matching.
+    when_not_to_use: >
+      Do not use for product_understanding, hiring_signal,
+      or work_alignment. If you do not have a founder name,
+      check company_website first. Always include the actual
+      founder name in the search query.
+    common_failure_modes:
+      - wrong_person_with_similar_name   # maps to: malformed_entity
+      - minimal_public_profile            # low signal — partial acceptable
+      - tavily_returns_company_not_person  # technical — refine query
+    extract_fields:
+      - founder_name
+      - current_role
+      - previous_companies
+      - education
+      - technical_background
+      - years_of_experience
+      - source_url
+
+  - source_name: crunchbase_via_tavily
+    source_category: validation
+    enabled: true
+    purpose:
+      - validate_funding_details
+      - confirm_company_stage
+    primary_dimensions:
+      - company_stage_and_size
+    secondary_dimensions: []
+    signal_types_supported:
+      - company_stage_and_size
+    trust_level: high
+    entity_quality: high
+    freshness_quality: medium
+    hiring_signal_strength: none
+    signal_confidence_alone: true
+    confidence_weight: high
+    cost_tier: medium
+    enrichment_needed_from: []
+    fallback_on_failure:
+      - funding_news
+      - web_search_general
+    recency_rule: >
+      Crunchbase data is generally current. If last funding
+      round is older than stale (180 days), cross-check with
+      funding_news.
+    when_to_use: >
+      Use when company_stage_and_size is unknown or partial.
+      Search Tavily with "site:crunchbase.com [company name]".
+      Can reach sufficient on its own.
+    when_not_to_use: >
+      Do not use for product_understanding or work_alignment.
+      Do not use for hiring_signal. If funding_news already
+      provided sufficient data, skip to save cost.
+    common_failure_modes:
+      - tavily_returns_search_page_not_profile  # technical — refine query
+      - outdated_crunchbase_profile              # maps to: stale_entity
+      - company_not_on_crunchbase                # empty result, not rejection
+    extract_fields:
+      - funding_stage
+      - funding_amount
+      - investor_names
+      - employee_count
+      - founding_date
+      - headquarters
+      - source_url
+
+  # ─────────────────────────────────────────────────────────────
+  # FALLBACK SOURCE
+  # ─────────────────────────────────────────────────────────────
+
+  - source_name: web_search_general
+    source_category: fallback
+    enabled: true
+    purpose:
+      - fill_any_remaining_knowledge_gap
+      - last_resort_enrichment
+    primary_dimensions: []
+    secondary_dimensions:
+      - product_understanding
+      - founder_background
+      - work_alignment
+      - hiring_signal
+      - company_stage_and_size
+    signal_types_supported:
+      - product_understanding
+      - founder_background
+      - work_alignment
+      - hiring_signal
+      - company_stage_and_size
+    trust_level: low
+    entity_quality: low
+    freshness_quality: medium
+    hiring_signal_strength: weak
+    signal_confidence_alone: false
+    confidence_weight: low
+    cost_tier: medium
+    enrichment_needed_from: []
+    fallback_on_failure: []
+    recency_rule: >
+      Web search results vary in recency. The agent must
+      evaluate each result's date individually. Prioritize
+      results within fresh (30 days) for hiring signals
+      and recent (90 days) for other dimensions.
+
+    # ── Authoritative domain boost ─────────────────────────
+    # trust_level is low by default, but the research node
+    # should upgrade confidence for results from these
+    # authoritative domains:
+    authoritative_domains:
+      high_trust:
+        - company's own domain (matched against current_company.website)
+        - blog.[company_domain]
+        - techcrunch.com
+        - bloomberg.com
+        - reuters.com
+        - theinformation.com
+        - crunchbase.com
+        - linkedin.com/company
+        - linkedin.com/in
+      medium_trust:
+        - producthunt.com
+        - ycombinator.com
+        - news.ycombinator.com
+        - github.com
+        - medium.com/@[company_or_founder_name]
+      low_trust_default:
+        - everything else
+    authoritative_domain_rule: >
+      When a web_search_general result comes from a domain
+      listed in high_trust, treat the result's confidence_weight
+      as medium instead of low. When from medium_trust, treat
+      as low-to-medium (agent judgment). This allows
+      web_search_general to surface genuinely useful results
+      from authoritative sources while maintaining default
+      skepticism for unknown domains. The agent must check
+      the result URL's domain against this list before
+      assigning confidence.
+
+    when_to_use: >
+      Use only when no structured source returned useful
+      results for the current knowledge gap. This is the
+      last resort before marking a dimension as
+      insufficient_data. Search Tavily with a targeted
+      query like "[company name] [dimension keyword]".
+      Results are unstructured and low trust by default —
+      but results from authoritative_domains may be
+      upgraded. This source prevents empty research loops
+      where all structured sources fail.
+    when_not_to_use: >
+      Never use as a primary source. Never use if a
+      structured source exists that covers the same
+      dimension and has not been tried yet. Do not use
+      for sourcing — only for enrichment during the
+      research loop.
+    common_failure_modes:
+      - seo_spam_pages                 # maps to: malformed_entity
+      - irrelevant_results              # low signal, discard
+      - outdated_blog_posts             # maps to: stale_entity
+      - wrong_company_with_same_name    # maps to: malformed_entity
+    extract_fields:
+      - any_relevant_field_based_on_query
+      - result_domain
+      - source_url

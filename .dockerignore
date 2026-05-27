@@ -1,0 +1,27 @@
+# Secrets and local config — never bake these into an image
+.env
+config.yaml
+credentials.json
+token.json
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+
+# Runtime artefacts
+reports/
+.tmp/
+*.db
+*.db-shm
+*.db-wal
+
+# Dev tooling
+.git/
+.gitignore
+.claude/
+.vscode/
+.idea/

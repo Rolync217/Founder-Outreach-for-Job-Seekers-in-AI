@@ -1,0 +1,112 @@
+schedule:
+  pipeline_run_time: "06:00"    # local time — when sourcing starts
+  batch_send_time: "10:00"      # local time — when approved messages are sent
+  timezone: "America/Chicago"   # pytz timezone string
+  run_days: "mon,wed,fri"       # cron day_of_week
+  pipeline_enabled: false       # set true when ready to run on schedule
+
+targeting:
+  stages:
+    - pre-seed
+    - seed
+    - series-a
+  sectors:
+    - ai-ml-infra
+    - vertical-ai-saas
+  max_funding_usd: 5000000
+  funding_recency_days: 180
+  team_size_min: 5
+  team_size_max: 20
+  geographies:
+    - US
+  exclude_sectors:
+    - crypto
+    - web3
+  preferred_stack: python
+  hiring_roles:
+    - "AI Engineer"
+    - "Founding Engineer"
+    - "Full Stack Engineer"
+
+pipeline:
+  target_companies_per_day: 20
+  follow_up_after_days: 7
+  linkedin_send_cap_per_day: 20
+  linkedin_delay_min_seconds: 3
+  linkedin_delay_max_seconds: 8
+  cost_cap_daily_usd: 5          # stop pipeline if daily API cost exceeds this
+  dry_run: true                  # true = no actual sends, log only
+  debug_mode: false              # true = write verbose debug rows to debug_logs table
+
+user_profile:
+  name: "Your Name"
+  background: "Brief background — what you build, your expertise"
+  target_role: "The role title you're looking for"
+  target_cities:
+    - SF
+    - NYC
+    - Remote-US
+  linkedin_url: "https://www.linkedin.com/in/yourprofile"
+  cta: "Would love a 15-min chat"
+
+models:
+  filter: "claude-haiku-4-5-20251001"
+  research: "claude-opus-4-6"
+  drafting: "claude-sonnet-4-6"
+
+outreach:
+  tone: "curious and collaborative, founder-to-founder"
+  max_words: 150
+  banned_phrases:
+    - "looking for a job"
+    - "job search"
+    - "open to opportunities"
+    - "salary"
+    - "compensation"
+  channel_priority:
+    - linkedin
+    - email
+
+sources:
+  yc:
+    enabled: true
+    tier: primary
+    scraper: scrape_yc
+    max_results: 30
+    url: "https://www.ycombinator.com/companies"
+  a16z:
+    enabled: true
+    tier: primary
+    scraper: scrape_a16z
+    max_results: 15
+    url: "https://a16z.com/portfolio"
+  crunchbase:
+    enabled: true
+    tier: primary
+    scraper: scrape_crunchbase
+    max_results: 20
+  funding_news:
+    enabled: true
+    tier: primary
+    scraper: scrape_funding_news
+    max_results: 20
+  sequoia:
+    enabled: true
+    tier: secondary
+    scraper: scrape_sequoia
+    max_results: 15
+  first_round:
+    enabled: true
+    tier: secondary
+    scraper: scrape_first_round
+    max_results: 15
+  greylock:
+    enabled: true
+    tier: secondary
+    scraper: scrape_greylock
+    max_results: 15
+  techcrunch:
+    enabled: true
+    tier: secondary
+    scraper: scrape_techcrunch
+    max_results: 20

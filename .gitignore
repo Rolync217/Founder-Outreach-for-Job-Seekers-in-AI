@@ -1,0 +1,34 @@
+# Secrets
+.env
+credentials.json
+token.json
+
+# Local config (copy config.example.yaml → config.yaml and fill in your details)
+config.yaml
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Temporary files
+.tmp/
+reports/
+*.db
+*.db-shm
+*.db-wal
+
+# macOS
+.DS_Store
+
+# Claude Code
+.claude/
+
+# IDE
+.vscode/
+.idea/
