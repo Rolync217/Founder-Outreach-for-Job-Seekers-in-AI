@@ -98,4 +98,11 @@ def run_pipeline(
         final_state.get("daily_cost", 0.0),
     )
 
+    try:
+        from tools.export import export
+        export_path = export()
+        logger.info("Excel export written → %s", export_path)
+    except Exception as e:
+        logger.warning("Excel export failed (non-fatal): %s", e)
+
     return final_state

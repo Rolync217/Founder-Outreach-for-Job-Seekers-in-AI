@@ -147,6 +147,8 @@ supervisor → sourcing → supervisor → research → scoring → supervisor �
 - **Autonomous** — `scheduler.py` runs the full LangGraph graph on a cron schedule via APScheduler
 - **MCP** — `python -m pipeline_v2.mcp_server.server` exposes 17 tools over stdio for Claude Desktop or Claude Code
 
+**MCP mode does NOT expose the pipeline workflow.** Claude Desktop only gets the data-gathering tools (search, scrape, LinkedIn, YC sourcing, Excel export). There is no LangGraph graph, no supervisor, no scoring loop. Claude Desktop is the reasoning layer — it calls tools directly based on the conversation. If you ask it to research a company, it calls the scraping and LinkedIn tools itself.
+
 **Cost controls:**
 - Daily cap: `pipeline.cost_cap_daily_usd` in `config.yaml`
 - Per-stage cost is logged to the `cost_logs_v2` Postgres table

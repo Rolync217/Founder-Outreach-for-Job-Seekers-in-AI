@@ -58,11 +58,15 @@ python tools/migrate.py
 ## Viewing your data
 
 **Export to Excel:**
+
+The pipeline automatically writes `reports/outreach_export_<timestamp>.xlsx` at the end of every run. Open it directly — no extra command needed.
+
+To export manually at any time:
 ```bash
 python tools/export.py
-# writes reports/outreach_export_<timestamp>.xlsx
-# Sheets: Companies · Scores · Outreach Drafts · Research
 ```
+
+Sheets: Companies · Scores · Outreach Drafts · Research
 
 **Connect directly with a Postgres client:**
 
@@ -117,7 +121,9 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 }
 ```
 
-Restart Claude Desktop. The pipeline's 17 tools (search, scrape, LinkedIn, YC sourcing) will be available as MCP tools you can call directly in conversation.
+Restart Claude Desktop. The pipeline's 17 tools (search, scrape, LinkedIn, YC sourcing, and Excel export) will be available as MCP tools you can call directly in conversation.
+
+**Important:** In MCP mode, Claude Desktop has access to the data-gathering tools only — the LangGraph pipeline workflow is not exposed. Claude Desktop is itself the reasoning layer. You ask it to research a company, check hiring signals, or draft a message, and it calls the tools directly based on your conversation. There is no graph execution, no supervisor node, and no scoring loop running in the background.
 
 ---
 
