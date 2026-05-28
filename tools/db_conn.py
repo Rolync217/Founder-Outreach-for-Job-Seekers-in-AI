@@ -65,7 +65,5 @@ def get_conn() -> _Conn:
             "DATABASE_URL is not set. "
             "Add it to your .env: postgresql://user:pass@host/dbname"
         )
-    # sslmode=require is needed for Supabase and most hosted Postgres providers.
-    # Keyword arg takes effect only if the URL doesn't already specify sslmode.
-    raw = psycopg2.connect(DATABASE_URL, sslmode="require", connect_timeout=10)
+    raw = psycopg2.connect(DATABASE_URL, connect_timeout=5)
     return _Conn(raw)
