@@ -34,6 +34,8 @@ Tell the user you need four keys. Ask for them one at a time and tell them where
 - `FIRECRAWL_API_KEY` — firecrawl.dev
 - `LINKDAPI_KEY` — linkdapi.com
 - `DATABASE_URL` — a Postgres connection string: `postgresql://user:pass@host:5432/dbname`
+
+  **If using Supabase:** do NOT use the "Direct connection" string — it is IPv6 only and will fail on most networks. Use the **Session mode** string instead. In your Supabase dashboard click **Connect → Session pooler** and copy that URL. It looks like: `postgresql://postgres.PROJECTREF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres`
 - `LANGSMITH_API_KEY` — optional, smith.langchain.com (for pipeline tracing)
 
 ```bash

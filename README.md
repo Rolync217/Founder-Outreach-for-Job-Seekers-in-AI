@@ -30,6 +30,8 @@ Drafted messages are stored in Postgres. Sending is not yet implemented — `dry
 - Local: `brew install postgresql && brew services start postgresql`
 - Hosted (free tier): [Supabase](https://supabase.com), [Neon](https://neon.tech), [Railway](https://railway.app)
 
+> **Supabase users:** use the **Session mode** connection string, not the Direct connection. The direct connection is IPv6-only and will fail on most networks. In your Supabase dashboard click **Connect → Session pooler** and copy that URL.
+
 Once you have a connection string (`postgresql://user:pass@host:5432/dbname`), open the repo in **Claude Code** or **Codex** and paste this:
 
 ```
