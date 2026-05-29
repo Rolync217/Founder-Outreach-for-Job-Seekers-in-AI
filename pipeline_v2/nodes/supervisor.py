@@ -21,10 +21,11 @@ from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, is_over_limit, add_cost
 from pipeline_v2.lib.scope_loader import get_daily_target
 from pipeline_v2.lib.decision_logger import log_decision
+from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_OPUS_MODEL = "anthropic/claude-opus-4-6"
+_SUPERVISOR_MODEL = cfg.models.supervisor
 
 
 def _strip_fences(text: str) -> str:
@@ -136,7 +137,7 @@ def _opus_quality_eval(
 
     def _call():
         return client.messages.create(
-            model=_OPUS_MODEL,
+            model=_SUPERVISOR_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -144,7 +145,7 @@ def _opus_quality_eval(
     response = _call_with_retry(_call)
     in_tok = response.usage.input_tokens
     out_tok = response.usage.output_tokens
-    cost = compute_cost(_OPUS_MODEL, in_tok, out_tok)
+    cost = compute_cost(_SUPERVISOR_MODEL, in_tok, out_tok)
 
     raw_text = _strip_fences(response.content[0].text)
     try:
@@ -193,13 +194,13 @@ def _opus_end_of_run_summary(
 
     def _call():
         return client.messages.create(
-            model=_OPUS_MODEL,
+            model=_SUPERVISOR_MODEL,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
 
     response = _call_with_retry(_call)
-    cost = compute_cost(_OPUS_MODEL, response.usage.input_tokens, response.usage.output_tokens)
+    cost = compute_cost(_SUPERVISOR_MODEL, response.usage.input_tokens, response.usage.output_tokens)
     summary = response.content[0].text.strip()
     return summary, cost
 
@@ -343,7 +344,7 @@ def supervisor_node(state: AgentState) -> dict:
             reasoning=quality_result.get("quality_notes", ""),
             next_action="leverage" if quality_result.get("quality_ok") else "skip",
             call_type="supervisor_eval",
-            model_used=_OPUS_MODEL,
+            model_used=_SUPERVISOR_MODEL,
             input_tokens=q_in_tok,
             output_tokens=q_out_tok,
             node_specific={

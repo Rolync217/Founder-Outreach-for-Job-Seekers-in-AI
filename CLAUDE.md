@@ -140,10 +140,7 @@ supervisor → sourcing → supervisor → research → scoring → supervisor �
 | `skills/sources.yaml` | 15 source definitions with trust/cost metadata |
 | `tools/config_loader.py` | loads `config.yaml` + `.env` at **import time** — `config.yaml` must exist before any node runs |
 
-**Models used:**
-- `claude-haiku-4-5-20251001` — entity extraction in the sourcing node (cheap, fast)
-- `claude-sonnet-4-6` — main decision-making in research, scoring, leverage, drafting
-- Opus — quality eval checkpoints in supervisor and end-of-run summary
+**Models:** configured in `config.yaml` under `models:` — 8 keys, one per node role. Change any entry to swap the model; no Python edits needed. See README for the full key reference.
 
 **Two runtime modes:**
 - **Autonomous** — `scheduler.py` runs the full LangGraph graph on a cron schedule via APScheduler

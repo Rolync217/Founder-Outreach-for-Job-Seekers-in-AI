@@ -12,10 +12,11 @@ from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost
 from pipeline_v2.lib.decision_logger import log_decision
 from pipeline_v2.lib.db_persistence import persist_cost_log
+from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_OPUS_MODEL = "claude-opus-4-6"
+_LEVERAGE_MODEL = cfg.models.leverage
 
 
 def _strip_fences(text: str) -> str:
@@ -107,7 +108,7 @@ def _opus_leverage_explore(
 
     def _call():
         return client.messages.create(
-            model=_OPUS_MODEL,
+            model=_LEVERAGE_MODEL,
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -164,7 +165,7 @@ def _opus_leverage_select(
 
     def _call():
         return client.messages.create(
-            model=_OPUS_MODEL,
+            model=_LEVERAGE_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -214,12 +215,12 @@ def leverage_node(state: AgentState) -> dict:
 
     # Call 1: explore angles
     angles, in_tok_1, out_tok_1 = _opus_leverage_explore(client, current_company, knowledge_state, hiring_signals)
-    cost_1 = compute_cost(_OPUS_MODEL, in_tok_1, out_tok_1)
+    cost_1 = compute_cost(_LEVERAGE_MODEL, in_tok_1, out_tok_1)
     persist_cost_log(
         run_id=state.get("run_id", ""),
         stage="leverage",
         company_id=company_id,
-        model=_OPUS_MODEL,
+        model=_LEVERAGE_MODEL,
         input_tokens=in_tok_1,
         output_tokens=out_tok_1,
         cost_usd=cost_1,
@@ -233,7 +234,7 @@ def leverage_node(state: AgentState) -> dict:
         reasoning=f"explored {len(angles)} leverage angles",
         next_action="select",
         call_type="leverage_explore",
-        model_used=_OPUS_MODEL, input_tokens=in_tok_1, output_tokens=out_tok_1,
+        model_used=_LEVERAGE_MODEL, input_tokens=in_tok_1, output_tokens=out_tok_1,
         node_specific={"angles_count": len(angles), "angles": angles},
     )
 
@@ -241,12 +242,12 @@ def leverage_node(state: AgentState) -> dict:
     select_result, in_tok_2, out_tok_2 = _opus_leverage_select(
         client, current_company, knowledge_state, hiring_signals, angles
     )
-    cost_2 = compute_cost(_OPUS_MODEL, in_tok_2, out_tok_2)
+    cost_2 = compute_cost(_LEVERAGE_MODEL, in_tok_2, out_tok_2)
     persist_cost_log(
         run_id=state.get("run_id", ""),
         stage="leverage",
         company_id=company_id,
-        model=_OPUS_MODEL,
+        model=_LEVERAGE_MODEL,
         input_tokens=in_tok_2,
         output_tokens=out_tok_2,
         cost_usd=cost_2,
@@ -280,7 +281,7 @@ def leverage_node(state: AgentState) -> dict:
         reasoning=select_result.get("selection_reasoning", ""),
         next_action="drafting",
         call_type="leverage_select",
-        model_used=_OPUS_MODEL, input_tokens=in_tok_2, output_tokens=out_tok_2,
+        model_used=_LEVERAGE_MODEL, input_tokens=in_tok_2, output_tokens=out_tok_2,
         node_specific=reasoning_fields,
     )
 
