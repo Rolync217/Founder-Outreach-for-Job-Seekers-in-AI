@@ -57,6 +57,25 @@ python tools/migrate.py
 
 ---
 
+## Model configuration
+
+All model names live in `config.yaml` under the `models:` block. Change any entry to swap the model for that role — no Python edits needed. Model IDs follow your provider's format:
+- **OpenRouter:** `provider/model-name` — e.g. `deepseek/deepseek-chat`, `anthropic/claude-sonnet-4-6`
+- **Anthropic direct:** model ID only — e.g. `claude-sonnet-4-6`
+
+| Key | Node | Role | Default |
+|-----|------|------|---------|
+| `filter` | sourcing | Entity extraction from raw search results — cheap, high-volume | `claude-haiku-4-5-20251001` |
+| `sourcing` | sourcing | Company planning and search query generation | `claude-sonnet-4-6` |
+| `research` | research | Per-iteration source selection and knowledge evaluation | `claude-sonnet-4-6` |
+| `research_synthesis` | research | Advisor checkpoints — synthesizes or redirects the agent when stuck | `claude-opus-4-6` |
+| `scoring` | scoring | Assigns qualitative fit labels across 6 dimensions | `claude-sonnet-4-6` |
+| `leverage` | leverage | Matches your background to what the company is actually building | `claude-opus-4-6` |
+| `drafting` | drafting | Writes the outreach message | `claude-sonnet-4-6` |
+| `supervisor` | supervisor | Quality gate decisions and end-of-run summary | `claude-opus-4-6` |
+
+---
+
 ## Viewing your data
 
 **Export to Excel:**
