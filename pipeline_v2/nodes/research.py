@@ -41,8 +41,8 @@ from pipeline_v2.lib.db_persistence import persist_company, persist_research, pe
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = "claude-sonnet-4-6"
-_OPUS_MODEL = "claude-opus-4-6"
+_SONNET_MODEL = cfg.models.research
+_OPUS_MODEL = cfg.models.research_synthesis
 
 
 def _strip_fences(text: str) -> str:

@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 _USER_NAME = cfg.get("user_profile", {}).get("name", "the candidate")
 _USER_BACKGROUND = cfg.get("user_profile", {}).get("background", "a software engineer")
 
-_HAIKU_MODEL = "claude-haiku-4-5-20251001"
-_SONNET_MODEL = "claude-sonnet-4-6"
+_HAIKU_MODEL = cfg.models.filter
+_SONNET_MODEL = cfg.models.sourcing
 
 
 def _strip_fences(text: str) -> str:

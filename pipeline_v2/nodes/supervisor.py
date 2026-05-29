@@ -21,10 +21,11 @@ from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, is_over_limit, add_cost
 from pipeline_v2.lib.scope_loader import get_daily_target
 from pipeline_v2.lib.decision_logger import log_decision
+from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_OPUS_MODEL = "anthropic/claude-opus-4-6"
+_OPUS_MODEL = cfg.models.supervisor
 
 
 def _strip_fences(text: str) -> str:

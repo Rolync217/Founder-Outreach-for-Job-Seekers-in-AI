@@ -18,10 +18,11 @@ from pipeline_v2.lib.scope_loader import get_scoring_config
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost
 from pipeline_v2.lib.db_persistence import persist_scoring, persist_cost_log
 from pipeline_v2.lib.decision_logger import log_decision
+from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = "claude-sonnet-4-6"
+_SONNET_MODEL = cfg.models.scoring
 
 
 def _build_scoring_prompt(state: dict, scoring_cfg: dict) -> str:

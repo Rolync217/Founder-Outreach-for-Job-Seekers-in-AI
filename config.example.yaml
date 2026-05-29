@@ -49,9 +49,14 @@ user_profile:
   cta: "Would love a 15-min chat"
 
 models:
-  filter: "claude-haiku-4-5-20251001"
-  research: "claude-opus-4-6"
-  drafting: "claude-sonnet-4-6"
+  filter: "deepseek/deepseek-chat"          # sourcing node — entity extraction (cheap/fast)
+  sourcing: "anthropic/claude-sonnet-4-6"   # sourcing node — company planning
+  research: "deepseek/deepseek-r1"          # research node — deep research
+  research_synthesis: "anthropic/claude-opus-4-6"  # research node — final synthesis
+  scoring: "anthropic/claude-sonnet-4-6"    # scoring node
+  leverage: "anthropic/claude-opus-4-6"     # leverage node
+  drafting: "anthropic/claude-sonnet-4-6"   # drafting node
+  supervisor: "anthropic/claude-opus-4-6"   # supervisor node
 
 outreach:
   tone: "curious and collaborative, founder-to-founder"

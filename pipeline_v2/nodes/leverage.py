@@ -12,10 +12,11 @@ from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost
 from pipeline_v2.lib.decision_logger import log_decision
 from pipeline_v2.lib.db_persistence import persist_cost_log
+from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_OPUS_MODEL = "claude-opus-4-6"
+_OPUS_MODEL = cfg.models.leverage
 
 
 def _strip_fences(text: str) -> str:

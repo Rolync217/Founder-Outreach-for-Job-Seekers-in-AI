@@ -17,7 +17,7 @@ from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = "claude-sonnet-4-6"
+_SONNET_MODEL = cfg.models.drafting
 _USER_FIRST_NAME = cfg.get("user_profile", {}).get("name", "").split()[0].lower()
 
 
