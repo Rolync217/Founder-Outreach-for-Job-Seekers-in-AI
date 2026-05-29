@@ -41,8 +41,8 @@ from pipeline_v2.lib.db_persistence import persist_company, persist_research, pe
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = cfg.models.research
-_OPUS_MODEL = cfg.models.research_synthesis
+_RESEARCH_MODEL = cfg.models.research
+_SYNTHESIS_MODEL = cfg.models.research_synthesis
 
 
 def _strip_fences(text: str) -> str:
@@ -335,7 +335,7 @@ def _sonnet_kickoff(
 
     def _call():
         return client.messages.create(
-            model=_SONNET_MODEL,
+            model=_RESEARCH_MODEL,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -479,7 +479,7 @@ def _sonnet_iteration(
 
     def _call():
         return client.messages.create(
-            model=_SONNET_MODEL,
+            model=_RESEARCH_MODEL,
             max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -630,7 +630,7 @@ def _opus_checkpoint(
 
     def _call():
         return client.messages.create(
-            model=_OPUS_MODEL,
+            model=_SYNTHESIS_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -740,12 +740,12 @@ def research_node(state: AgentState) -> dict:
         research_cost=cost_by_stage.get("research", 0.0),
         remaining=max(0.0, get_cost_cap() - daily_cost),
     )
-    cost = compute_cost(_SONNET_MODEL, in_tok, out_tok)
+    cost = compute_cost(_RESEARCH_MODEL, in_tok, out_tok)
     persist_cost_log(
         run_id=run_id,
         stage="research",
         company_id=(state.get("current_company") or {}).get("company_id"),
-        model=_SONNET_MODEL,
+        model=_RESEARCH_MODEL,
         input_tokens=in_tok,
         output_tokens=out_tok,
         cost_usd=cost,
@@ -764,7 +764,7 @@ def research_node(state: AgentState) -> dict:
             "what_i_expect": kickoff_result.get("what_i_expect"),
             "pool_gap_addressed": kickoff_result.get("pool_gap_addressed"),
         },
-        model_used=_SONNET_MODEL, input_tokens=in_tok, output_tokens=out_tok,
+        model_used=_RESEARCH_MODEL, input_tokens=in_tok, output_tokens=out_tok,
         call_type="research_kickoff", iteration_number=0,
     )
 
@@ -890,12 +890,12 @@ def research_node(state: AgentState) -> dict:
             research_cost=cost_by_stage.get("research", 0.0),
             remaining=max(0.0, get_cost_cap() - daily_cost),
         )
-        cost = compute_cost(_SONNET_MODEL, in_tok, out_tok)
+        cost = compute_cost(_RESEARCH_MODEL, in_tok, out_tok)
         persist_cost_log(
             run_id=run_id,
             stage="research",
             company_id=(state.get("current_company") or {}).get("company_id"),
-            model=_SONNET_MODEL,
+            model=_RESEARCH_MODEL,
             input_tokens=in_tok,
             output_tokens=out_tok,
             cost_usd=cost,
@@ -942,7 +942,7 @@ def research_node(state: AgentState) -> dict:
                 "dims_updated": iter_result.get("dims_updated", []),
                 "stuck_signal": stuck_signal,
             },
-            model_used=_SONNET_MODEL, input_tokens=in_tok, output_tokens=out_tok,
+            model_used=_RESEARCH_MODEL, input_tokens=in_tok, output_tokens=out_tok,
             call_type="research_iteration", iteration_number=iterations + 1,
         )
 
@@ -988,12 +988,12 @@ def research_node(state: AgentState) -> dict:
                 opus_client, current_company, search_history, knowledge_state,
                 iterations + 1, "stuck" if stuck_signal else "interval",
             )
-            cost = compute_cost(_OPUS_MODEL, in_tok, out_tok)
+            cost = compute_cost(_SYNTHESIS_MODEL, in_tok, out_tok)
             persist_cost_log(
                 run_id=run_id,
                 stage="research",
                 company_id=(state.get("current_company") or {}).get("company_id"),
-                model=_OPUS_MODEL,
+                model=_SYNTHESIS_MODEL,
                 input_tokens=in_tok,
                 output_tokens=out_tok,
                 cost_usd=cost,
@@ -1021,7 +1021,7 @@ def research_node(state: AgentState) -> dict:
                         "redirect_instruction": checkpoint_result.get("redirect_instruction"),
                         "expected_from_redirect": checkpoint_result.get("expected_from_redirect"),
                     },
-                    model_used=_OPUS_MODEL, input_tokens=in_tok, output_tokens=out_tok,
+                    model_used=_SYNTHESIS_MODEL, input_tokens=in_tok, output_tokens=out_tok,
                     call_type="opus_checkpoint", iteration_number=iterations + 1,
                     was_redirected=True,
                     redirect_reason=checkpoint_result.get("what_was_missed", ""),
@@ -1051,7 +1051,7 @@ def research_node(state: AgentState) -> dict:
                         "work_alignment_reasoning": checkpoint_result.get("work_alignment_reasoning"),
                         "why_founders_evidence": checkpoint_result.get("why_founders_evidence"),
                     },
-                    model_used=_OPUS_MODEL, input_tokens=in_tok, output_tokens=out_tok,
+                    model_used=_SYNTHESIS_MODEL, input_tokens=in_tok, output_tokens=out_tok,
                     call_type="opus_synthesis", iteration_number=iterations + 1,
                 )
                 iterations += 1

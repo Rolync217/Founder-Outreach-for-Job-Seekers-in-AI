@@ -36,8 +36,8 @@ logger = logging.getLogger(__name__)
 _USER_NAME = cfg.get("user_profile", {}).get("name", "the candidate")
 _USER_BACKGROUND = cfg.get("user_profile", {}).get("background", "a software engineer")
 
-_HAIKU_MODEL = cfg.models.filter
-_SONNET_MODEL = cfg.models.sourcing
+_FILTER_MODEL = cfg.models.filter
+_SOURCING_MODEL = cfg.models.sourcing
 
 
 def _strip_fences(text: str) -> str:
@@ -327,7 +327,7 @@ def _sonnet_sourcing_decision(
 
     def _call():
         return client.messages.create(
-            model=_SONNET_MODEL,
+            model=_SOURCING_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -529,7 +529,7 @@ def _haiku_extract_entities(
 
     def _call():
         return client.messages.create(
-            model=_HAIKU_MODEL,
+            model=_FILTER_MODEL,
             max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -537,7 +537,7 @@ def _haiku_extract_entities(
     response = _call_with_retry(_call)
     haiku_in_tok = response.usage.input_tokens
     haiku_out_tok = response.usage.output_tokens
-    cost = compute_cost(_HAIKU_MODEL, haiku_in_tok, haiku_out_tok)
+    cost = compute_cost(_FILTER_MODEL, haiku_in_tok, haiku_out_tok)
 
     raw_text = response.content[0].text.strip()
     try:
@@ -658,14 +658,14 @@ def sourcing_node(state: AgentState) -> dict:
             low_quality_streak=low_quality_streak,
             sourcing_iterations=sourcing_iterations,
         )
-        sonnet_cost = compute_cost(_SONNET_MODEL, in_tok, out_tok)
+        sonnet_cost = compute_cost(_SOURCING_MODEL, in_tok, out_tok)
         cost_by_stage = add_cost(cost_by_stage, "sourcing", sonnet_cost)
         daily_cost += sonnet_cost
         persist_cost_log(
             run_id=run_id,
             stage="sourcing",
             company_id=None,
-            model=_SONNET_MODEL,
+            model=_SOURCING_MODEL,
             input_tokens=in_tok,
             output_tokens=out_tok,
             cost_usd=sonnet_cost,
@@ -726,7 +726,7 @@ def sourcing_node(state: AgentState) -> dict:
             node="sourcing", decision=source_name, confidence="medium",
             reasoning=decision.get("query_reasoning", ""),
             next_action="fetch", call_type=call_type,
-            model_used=_SONNET_MODEL, input_tokens=in_tok, output_tokens=out_tok,
+            model_used=_SOURCING_MODEL, input_tokens=in_tok, output_tokens=out_tok,
             node_specific={"search_query": search_query, "pool_size": len(pool), "thinking": thinking},
         )
 
@@ -818,7 +818,7 @@ def sourcing_node(state: AgentState) -> dict:
             run_id=run_id,
             stage="sourcing",
             company_id=None,
-            model=_HAIKU_MODEL,
+            model=_FILTER_MODEL,
             input_tokens=haiku_in_tok,
             output_tokens=haiku_out_tok,
             cost_usd=haiku_cost,

@@ -17,7 +17,7 @@ from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = cfg.models.drafting
+_DRAFTING_MODEL = cfg.models.drafting
 _USER_FIRST_NAME = cfg.get("user_profile", {}).get("name", "").split()[0].lower()
 
 
@@ -234,13 +234,13 @@ def _sonnet_draft(
 
     def _call():
         return client.messages.create(
-            model=_SONNET_MODEL,
+            model=_DRAFTING_MODEL,
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
 
     response = _call_with_retry(_call)
-    cost = compute_cost(_SONNET_MODEL, response.usage.input_tokens, response.usage.output_tokens)
+    cost = compute_cost(_DRAFTING_MODEL, response.usage.input_tokens, response.usage.output_tokens)
     text = response.content[0].text.strip()
     return text, cost, response.usage.input_tokens, response.usage.output_tokens
 
@@ -269,13 +269,13 @@ def _sonnet_founder_critique(
 
     def _call():
         return client.messages.create(
-            model=_SONNET_MODEL,
+            model=_DRAFTING_MODEL,
             max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
         )
 
     response = _call_with_retry(_call)
-    cost = compute_cost(_SONNET_MODEL, response.usage.input_tokens, response.usage.output_tokens)
+    cost = compute_cost(_DRAFTING_MODEL, response.usage.input_tokens, response.usage.output_tokens)
     in_tok = response.usage.input_tokens
     out_tok = response.usage.output_tokens
     raw = _strip_fences(response.content[0].text)
@@ -319,7 +319,7 @@ def drafting_node(state: AgentState) -> dict:
                 run_id=state.get("run_id", ""),
                 stage="drafting",
                 company_id=(state.get("current_company") or {}).get("company_id"),
-                model=_SONNET_MODEL,
+                model=_DRAFTING_MODEL,
                 input_tokens=in_tok,
                 output_tokens=out_tok,
                 cost_usd=cost,
@@ -335,7 +335,7 @@ def drafting_node(state: AgentState) -> dict:
                 reasoning=f"mode={mode} iteration={iteration}",
                 next_action="validate",
                 call_type="draft_generate",
-                model_used=_SONNET_MODEL,
+                model_used=_DRAFTING_MODEL,
                 input_tokens=in_tok, output_tokens=out_tok,
                 node_specific={"mode": mode, "iteration": iteration},
             )
@@ -374,7 +374,7 @@ def drafting_node(state: AgentState) -> dict:
                     reasoning=critique_result.get("main_concern", ""),
                     next_action="done",
                     call_type="draft_critique",
-                    model_used=_SONNET_MODEL,
+                    model_used=_DRAFTING_MODEL,
                     input_tokens=crit_in_tok, output_tokens=crit_out_tok,
                     node_specific={
                         "mode": mode, "seems_authentic": critique_result.get("seems_authentic"),

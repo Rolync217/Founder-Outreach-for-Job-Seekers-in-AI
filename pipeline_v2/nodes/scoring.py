@@ -22,7 +22,7 @@ from tools.config_loader import cfg
 
 logger = logging.getLogger(__name__)
 
-_SONNET_MODEL = cfg.models.scoring
+_SCORING_MODEL = cfg.models.scoring
 
 
 def _build_scoring_prompt(state: dict, scoring_cfg: dict) -> str:
@@ -90,7 +90,7 @@ def _call_scoring_agent(state: dict) -> dict:
 
     for _ in range(3):
         resp = client.messages.create(
-            model=_SONNET_MODEL,
+            model=_SCORING_MODEL,
             max_tokens=1024,
             tools=[SCORING_TOOL_DEFINITION],
             messages=messages,
@@ -167,12 +167,12 @@ def scoring_node(state: AgentState) -> dict:
 
     in_tok  = result.pop("_in_tok", 1200)
     out_tok = result.pop("_out_tok", 400)
-    cost = compute_cost(_SONNET_MODEL, in_tok, out_tok)
+    cost = compute_cost(_SCORING_MODEL, in_tok, out_tok)
     persist_cost_log(
         run_id=state.get("run_id", ""),
         stage="scoring",
         company_id=company_id,
-        model=_SONNET_MODEL,
+        model=_SCORING_MODEL,
         input_tokens=in_tok,
         output_tokens=out_tok,
         cost_usd=cost,
@@ -208,7 +208,7 @@ def scoring_node(state: AgentState) -> dict:
         reasoning=tier_reason,
         next_action="leverage" if tier in (1, 2) else "skip",
         call_type="scoring",
-        model_used=_SONNET_MODEL,
+        model_used=_SCORING_MODEL,
         input_tokens=in_tok,
         output_tokens=out_tok,
     )
