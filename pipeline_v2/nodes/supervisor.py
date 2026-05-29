@@ -24,7 +24,7 @@ from pipeline_v2.lib.decision_logger import log_decision
 
 logger = logging.getLogger(__name__)
 
-_OPUS_MODEL = "claude-opus-4-6"
+_OPUS_MODEL = "anthropic/claude-opus-4-6"
 
 
 def _strip_fences(text: str) -> str:

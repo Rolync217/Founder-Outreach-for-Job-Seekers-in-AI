@@ -23,11 +23,18 @@ reports/
 *.db-shm
 *.db-wal
 
+# Local reference docs (not for repo)
+linkdAPI.md
+linkedin_posts.md
+
 # macOS
 .DS_Store
 
 # Claude Code
 .claude/
+
+# Git worktrees
+.worktrees/
 
 # IDE
 .vscode/
