@@ -21,8 +21,11 @@ class _Models:
             return self._data[name]
         except KeyError:
             raise AttributeError(
-                f"Model key '{name}' not found in config.yaml models block. "
-                f"Available keys: {list(self._data.keys())}"
+                f"Model key '{name}' not found in config.yaml.\n"
+                f"  Available keys in your models block: {list(self._data.keys())}\n"
+                f"  The models block was expanded in a recent update — 8 keys are now required.\n"
+                f"  Fix: copy config.example.yaml to config.yaml and re-fill your user_profile section,\n"
+                f"  OR manually add the missing keys from config.example.yaml to your existing config.yaml."
             )
 
 

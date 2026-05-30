@@ -57,6 +57,29 @@ python tools/migrate.py
 
 ---
 
+## Upgrading from an older version
+
+If you already have a `config.yaml` from before May 2026, the `models:` block needs to be updated — 5 new model-role keys were added. You have two options:
+
+**Option A (recommended):** Re-copy the example and re-fill your profile:
+```bash
+cp config.example.yaml config.yaml
+# Then re-enter your user_profile details (name, background, target_role, etc.)
+```
+
+**Option B:** Open your existing `config.yaml` and add the 5 missing keys under `models:`:
+```yaml
+models:
+  # ... your existing keys ...
+  sourcing: "anthropic/claude-sonnet-4-6"
+  research_synthesis: "anthropic/claude-opus-4-6"
+  scoring: "anthropic/claude-sonnet-4-6"
+  leverage: "anthropic/claude-opus-4-6"
+  supervisor: "anthropic/claude-opus-4-6"
+```
+
+---
+
 ## Model configuration
 
 All model names live in `config.yaml` under the `models:` block. Change any entry to swap the model for that role — no Python edits needed. Model IDs follow your provider's format:
@@ -73,6 +96,8 @@ All model names live in `config.yaml` under the `models:` block. Change any entr
 | `leverage` | leverage | Matches your background to what the company is actually building | `claude-opus-4-6` |
 | `drafting` | drafting | Writes the outreach message | `claude-sonnet-4-6` |
 | `supervisor` | supervisor | Quality gate decisions and end-of-run summary | `claude-opus-4-6` |
+
+> **Cost accuracy note:** All LLM calls route through OpenRouter, whose per-token pricing may differ slightly from the provider list prices used internally for tracking. The pipeline's daily cost cap (`cost_cap_daily_usd` in `config.yaml`) is an estimate — actual charges on your OpenRouter invoice may be a little higher or lower. To stay safely within your real budget, set `cost_cap_daily_usd` a few dollars below your actual OpenRouter daily limit.
 
 ---
 
