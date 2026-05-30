@@ -65,5 +65,14 @@ def get_conn() -> _Conn:
             "DATABASE_URL is not set. "
             "Add it to your .env: postgresql://user:pass@host/dbname"
         )
-    raw = psycopg2.connect(DATABASE_URL, connect_timeout=5)
-    return _Conn(raw)
+    last_err = None
+    for attempt in range(2):
+        try:
+            raw = psycopg2.connect(DATABASE_URL, connect_timeout=10)
+            return _Conn(raw)
+        except psycopg2.OperationalError as e:
+            last_err = e
+            if attempt == 0:
+                import time
+                time.sleep(3)
+    raise last_err

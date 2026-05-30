@@ -4,6 +4,12 @@ This is a research and drafting pipeline for founder outreach. It finds early-st
 
 ---
 
+## Upgrading an existing installation
+
+If you already have a `config.yaml`, check your `models:` block. The latest version requires 8 keys (see `config.example.yaml`). Missing keys crash the pipeline at startup with an `AttributeError` that tells you which key is absent. Either re-copy `config.example.yaml` (then re-fill `user_profile`) or add the missing keys manually.
+
+---
+
 ## First-time setup
 
 When the user says anything like "set me up", "get me started", or "I just cloned this", follow these steps in order. Don't ask for everything upfront — gather information as each step needs it.
