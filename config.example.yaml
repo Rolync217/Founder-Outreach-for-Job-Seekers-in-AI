@@ -1,6 +1,5 @@
 schedule:
   pipeline_run_time: "06:00"    # local time — when sourcing starts
-  batch_send_time: "10:00"      # local time — when approved messages are sent
   timezone: "America/Chicago"   # pytz timezone string
   run_days: "mon,wed,fri"       # cron day_of_week
   pipeline_enabled: false       # set true when ready to run on schedule
@@ -30,12 +29,7 @@ targeting:
 
 pipeline:
   target_companies_per_day: 20
-  follow_up_after_days: 7
-  linkedin_send_cap_per_day: 20
-  linkedin_delay_min_seconds: 3
-  linkedin_delay_max_seconds: 8
   cost_cap_daily_usd: 5          # stop pipeline if daily API cost exceeds this
-  dry_run: true                  # true = no actual sends, log only
   debug_mode: false              # true = write verbose debug rows to debug_logs table
 
 user_profile:

@@ -22,7 +22,7 @@ Ask the user for:
 cp config.example.yaml config.yaml
 ```
 
-Fill in the `user_profile` block with the user's answers from Step 1. Leave `pipeline_enabled: false` and `dry_run: true` — safe defaults until they're ready to run.
+Fill in the `user_profile` block with the user's answers from Step 1. Leave `pipeline_enabled: false` — safe default until they're ready to run.
 
 ### Step 3 — API keys and .env
 
@@ -111,7 +111,6 @@ Skip to Step 7 (Done).
 
 Tell the user:
 - Everything is set up
-- `dry_run: true` is on — no messages will actually send until they change it in `config.yaml`
 - To run automatically: set `pipeline_enabled: true` in `config.yaml`, then:
   - Python: `python scheduler.py`
   - Docker: `docker compose up -d` (the scheduler restarts automatically)
@@ -159,5 +158,4 @@ supervisor → sourcing → supervisor → research → scoring → supervisor �
 
 - Never commit `.env` or `config.yaml` — both are gitignored
 - `config.yaml` is read at **import time** — if it doesn't exist the process crashes on startup
-- `dry_run: true` means no messages send — always verify this before enabling the scheduler
 - The sourcing node reads `skills/candidate-leverage/SKILL.md` to understand who to find companies for — if this is empty the outreach will be generic
