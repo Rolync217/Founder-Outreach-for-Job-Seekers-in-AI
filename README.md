@@ -16,11 +16,17 @@ Drafted messages are stored in Postgres. Sending is not yet implemented — `dry
 
 | Service | Used for | Required |
 |---------|----------|----------|
-| [Anthropic](https://console.anthropic.com) | all LLM calls | yes |
+| LLM provider (your choice) | all LLM calls — OpenRouter (recommended), Anthropic, Moonshot, or OpenAI | yes — one key for your chosen provider |
 | [Firecrawl](https://firecrawl.dev) | web scraping and search | yes |
 | [LinkdAPI](https://linkdapi.com) | LinkedIn hiring signals | yes |
 | PostgreSQL | data storage | yes |
 | [LangSmith](https://smith.langchain.com) | pipeline tracing | optional |
+
+**LLM provider options** (one key required):
+- **[OpenRouter](https://openrouter.ai/keys)** — recommended. One key covers 200+ models from Anthropic, DeepSeek, OpenAI, and others. Model strings use prefix `openrouter/` — e.g. `openrouter/anthropic/claude-sonnet-4-6`
+- **[Anthropic direct](https://console.anthropic.com)** — if you have a direct Anthropic API key. Prefix: `anthropic/` — e.g. `anthropic/claude-sonnet-4-6`
+- **[Moonshot / Kimi](https://platform.moonshot.cn)** — Prefix: `moonshot/` — e.g. `moonshot/moonshot-v1-8k`
+- **[OpenAI](https://platform.openai.com)** — Prefix: `openai/` — e.g. `openai/gpt-4o`
 
 ---
 
@@ -59,6 +65,39 @@ python tools/migrate.py
 
 ## Upgrading from an older version
 
+### Upgrading from the OpenRouter SDK-hack setup (pre-LiteLLM, before June 2026)
+
+If your `.env` has `ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1`, you're on the old setup. The pipeline now uses LiteLLM, so model strings and the env var have changed.
+
+**1. Update `.env`:** Replace `ANTHROPIC_API_KEY` + `ANTHROPIC_BASE_URL` with `OPENROUTER_API_KEY`:
+```bash
+# Remove these two lines:
+# ANTHROPIC_API_KEY=sk-ant-...
+# ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1
+
+# Add this instead:
+OPENROUTER_API_KEY=sk-or-v1-...
+```
+
+**2. Update model strings in `config.yaml`:** All model strings now require a provider prefix. Add `openrouter/` in front of every model entry:
+```yaml
+# Before:
+filter: "deepseek/deepseek-chat"
+sourcing: "anthropic/claude-sonnet-4-6"
+
+# After:
+filter: "openrouter/deepseek/deepseek-chat"
+sourcing: "openrouter/anthropic/claude-sonnet-4-6"
+```
+Apply this to all 8 keys. Or just re-copy the example: `cp config.example.yaml config.yaml` then re-fill your `user_profile` block.
+
+**3. Install LiteLLM:**
+```bash
+pip install -r requirements.txt
+```
+
+### Upgrading from before May 2026 (missing model keys)
+
 If you already have a `config.yaml` from before May 2026, the `models:` block needs to be updated — 5 new model-role keys were added. You have two options:
 
 **Option A (recommended):** Re-copy the example and re-fill your profile:
@@ -67,37 +106,52 @@ cp config.example.yaml config.yaml
 # Then re-enter your user_profile details (name, background, target_role, etc.)
 ```
 
-**Option B:** Open your existing `config.yaml` and add the 5 missing keys under `models:`:
+**Option B:** Open your existing `config.yaml` and add the 5 missing keys under `models:` (using your chosen provider prefix):
 ```yaml
 models:
   # ... your existing keys ...
-  sourcing: "anthropic/claude-sonnet-4-6"
-  research_synthesis: "anthropic/claude-opus-4-6"
-  scoring: "anthropic/claude-sonnet-4-6"
-  leverage: "anthropic/claude-opus-4-6"
-  supervisor: "anthropic/claude-opus-4-6"
+  sourcing: "openrouter/anthropic/claude-sonnet-4-6"
+  research_synthesis: "openrouter/anthropic/claude-opus-4-6"
+  scoring: "openrouter/anthropic/claude-sonnet-4-6"
+  leverage: "openrouter/anthropic/claude-opus-4-6"
+  supervisor: "openrouter/anthropic/claude-opus-4-6"
 ```
 
 ---
 
 ## Model configuration
 
-All model names live in `config.yaml` under the `models:` block. Change any entry to swap the model for that role — no Python edits needed. Model IDs follow your provider's format:
-- **OpenRouter:** `provider/model-name` — e.g. `deepseek/deepseek-chat`, `anthropic/claude-sonnet-4-6`
-- **Anthropic direct:** model ID only — e.g. `claude-sonnet-4-6`
+All model names live in `config.yaml` under the `models:` block. Change any entry to swap the model for that role — no Python edits needed. Model strings use LiteLLM's `provider/model` prefix format:
+
+| Prefix | Provider | Required env var |
+|--------|----------|-----------------|
+| `openrouter/` | OpenRouter (default) | `OPENROUTER_API_KEY` |
+| `anthropic/` | Anthropic direct | `ANTHROPIC_API_KEY` |
+| `moonshot/` | Moonshot / Kimi | `MOONSHOT_API_KEY` |
+| `openai/` | OpenAI | `OPENAI_API_KEY` |
+
+Example: `openrouter/anthropic/claude-sonnet-4-6` routes via OpenRouter; change the prefix to `anthropic/claude-sonnet-4-6` to call Anthropic directly.
 
 | Key | Node | Role | Default |
 |-----|------|------|---------|
-| `filter` | sourcing | Entity extraction from raw search results — cheap, high-volume | `claude-haiku-4-5-20251001` |
-| `sourcing` | sourcing | Company planning and search query generation | `claude-sonnet-4-6` |
-| `research` | research | Per-iteration source selection and knowledge evaluation | `claude-sonnet-4-6` |
-| `research_synthesis` | research | Advisor checkpoints — synthesizes or redirects the agent when stuck | `claude-opus-4-6` |
-| `scoring` | scoring | Assigns qualitative fit labels across 6 dimensions | `claude-sonnet-4-6` |
-| `leverage` | leverage | Matches your background to what the company is actually building | `claude-opus-4-6` |
-| `drafting` | drafting | Writes the outreach message | `claude-sonnet-4-6` |
-| `supervisor` | supervisor | Quality gate decisions and end-of-run summary | `claude-opus-4-6` |
+| `filter` | sourcing | Entity extraction from raw search results — cheap, high-volume | `openrouter/deepseek/deepseek-chat` |
+| `sourcing` | sourcing | Company planning and search query generation | `openrouter/anthropic/claude-sonnet-4-6` |
+| `research` | research | Per-iteration source selection and knowledge evaluation | `openrouter/deepseek/deepseek-r1` |
+| `research_synthesis` | research | Advisor checkpoints — synthesizes or redirects the agent when stuck | `openrouter/anthropic/claude-opus-4-6` |
+| `scoring` | scoring | Assigns qualitative fit labels across 6 dimensions | `openrouter/anthropic/claude-sonnet-4-6` |
+| `leverage` | leverage | Matches your background to what the company is actually building | `openrouter/anthropic/claude-opus-4-6` |
+| `drafting` | drafting | Writes the outreach message | `openrouter/anthropic/claude-sonnet-4-6` |
+| `supervisor` | supervisor | Quality gate decisions and end-of-run summary | `openrouter/anthropic/claude-opus-4-6` |
 
-> **Cost accuracy note:** All LLM calls route through OpenRouter, whose per-token pricing may differ slightly from the provider list prices used internally for tracking. The pipeline's daily cost cap (`cost_cap_daily_usd` in `config.yaml`) is an estimate — actual charges on your OpenRouter invoice may be a little higher or lower. To stay safely within your real budget, set `cost_cap_daily_usd` a few dollars below your actual OpenRouter daily limit.
+> **Cost accuracy note:** When using OpenRouter, per-token pricing may differ slightly from the provider list prices used internally for tracking. The pipeline's daily cost cap (`cost_cap_daily_usd` in `config.yaml`) is an estimate — actual charges on your provider invoice may be a little higher or lower. To stay safely within your real budget, set `cost_cap_daily_usd` a few dollars below your actual daily limit.
+
+**Provider prefixes:** Model strings follow LiteLLM's `provider/model` format. Change the prefix to switch providers without touching any Python code:
+- `openrouter/anthropic/claude-sonnet-4-6` — via OpenRouter (default)
+- `anthropic/claude-sonnet-4-6` — Anthropic direct
+- `moonshot/moonshot-v1-8k` — Moonshot / Kimi direct
+- `openai/gpt-4o` — OpenAI direct
+
+Set the matching API key in `.env` — only the one for your chosen provider is needed.
 
 ---
 

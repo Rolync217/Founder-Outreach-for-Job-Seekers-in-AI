@@ -13,9 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from pipeline_v2.lib.llm_client import call_llm
 
 try:
     from playwright.sync_api import sync_playwright
@@ -178,7 +177,6 @@ def _build_sourcing_sources_detail(
 
 
 def _sonnet_sourcing_decision(
-    client: anthropic.Anthropic,
     pool: list[dict],
     pool_target: int,
     under_covered_dims: list[str],
@@ -326,16 +324,14 @@ def _sonnet_sourcing_decision(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_SOURCING_MODEL,
-            max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         parsed = json.loads(raw)
@@ -448,7 +444,6 @@ def _fetch_yc_directory(run_type: str) -> dict:
 
 
 def _haiku_extract_entities(
-    client: anthropic.Anthropic,
     source: dict,
     results: list[dict],
 ) -> tuple[list[dict], float, int, int]:
@@ -528,18 +523,16 @@ def _haiku_extract_entities(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_FILTER_MODEL,
-            max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
         )
 
-    response = _call_with_retry(_call)
-    haiku_in_tok = response.usage.input_tokens
-    haiku_out_tok = response.usage.output_tokens
+    raw_content, haiku_in_tok, haiku_out_tok = _call_with_retry(_call)
     cost = compute_cost(_FILTER_MODEL, haiku_in_tok, haiku_out_tok)
 
-    raw_text = response.content[0].text.strip()
+    raw_text = raw_content.strip()
     try:
         entities = json.loads(_strip_fences(raw_text))
         if not isinstance(entities, list):
@@ -594,8 +587,6 @@ def sourcing_node(state: AgentState) -> dict:
     cost_by_stage: dict[str, float] = dict(state.get("cost_by_stage") or {})
     daily_cost: float = state.get("daily_cost") or 0.0
 
-    client = wrap_anthropic(anthropic.Anthropic())
-
     all_sources = load_sources()
     light_categories = get_light_source_categories()
 
@@ -649,7 +640,7 @@ def sourcing_node(state: AgentState) -> dict:
 
         # Sonnet decides which source to use and generates the search query
         decision, in_tok, out_tok = _sonnet_sourcing_decision(
-            client, pool, target, under_covered,
+            pool, target, under_covered,
             all_sources, light_categories, attempted_source_names, run_type,
             work_alignment_criteria, work_type_preferences,
             sourcing_cost=cost_by_stage.get("sourcing", 0.0),
@@ -813,7 +804,7 @@ def sourcing_node(state: AgentState) -> dict:
             sourcing_iterations += 1
             continue
 
-        entities, haiku_cost, haiku_in_tok, haiku_out_tok = _haiku_extract_entities(client, source_dict, fetch_result["results"])
+        entities, haiku_cost, haiku_in_tok, haiku_out_tok = _haiku_extract_entities(source_dict, fetch_result["results"])
         persist_cost_log(
             run_id=run_id,
             stage="sourcing",

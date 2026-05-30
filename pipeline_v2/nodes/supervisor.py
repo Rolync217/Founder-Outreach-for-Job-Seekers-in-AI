@@ -13,9 +13,8 @@ import time
 import logging
 from typing import Any, Callable
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from pipeline_v2.lib.llm_client import call_llm
 
 from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, is_over_limit, add_cost
@@ -99,7 +98,6 @@ def _pop_next_company(candidate_pool: list[dict]) -> tuple[dict, list[dict]]:
 # ---------------------------------------------------------------------------
 
 def _opus_quality_eval(
-    client: anthropic.Anthropic,
     state: AgentState,
 ) -> tuple[dict, float, int, int]:
     """Call Opus to validate research quality for the current company.
@@ -136,18 +134,16 @@ def _opus_quality_eval(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_SUPERVISOR_MODEL,
-            max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
+    raw_content, in_tok, out_tok = _call_with_retry(_call)
     cost = compute_cost(_SUPERVISOR_MODEL, in_tok, out_tok)
 
-    raw_text = _strip_fences(response.content[0].text)
+    raw_text = _strip_fences(raw_content)
     try:
         result = json.loads(raw_text)
         result.setdefault("decision_reasoning", "")
@@ -172,7 +168,6 @@ def _opus_quality_eval(
 
 
 def _opus_end_of_run_summary(
-    client: anthropic.Anthropic,
     state: AgentState,
 ) -> tuple[str, float]:
     """Call Opus once at the end of a run for a plain-text summary.
@@ -193,15 +188,15 @@ def _opus_end_of_run_summary(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_SUPERVISOR_MODEL,
-            max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024,
         )
 
-    response = _call_with_retry(_call)
-    cost = compute_cost(_SUPERVISOR_MODEL, response.usage.input_tokens, response.usage.output_tokens)
-    summary = response.content[0].text.strip()
+    content, in_tok, out_tok = _call_with_retry(_call)
+    cost = compute_cost(_SUPERVISOR_MODEL, in_tok, out_tok)
+    summary = content.strip()
     return summary, cost
 
 
@@ -224,7 +219,6 @@ def _pick_next_company_or_source(
 
 
 def _finalize_run(
-    client: anthropic.Anthropic,
     state: AgentState,
     current_cost_by_stage: dict,
     current_daily_cost: float,
@@ -239,7 +233,7 @@ def _finalize_run(
     state_view["cost_by_stage"] = current_cost_by_stage
     state_view["daily_cost"] = current_daily_cost
 
-    summary, summary_cost = _opus_end_of_run_summary(client, state_view)  # type: ignore[arg-type]
+    summary, summary_cost = _opus_end_of_run_summary(state_view)
 
     final_cost_by_stage = add_cost(current_cost_by_stage, "supervisor", summary_cost)
     final_daily_cost = current_daily_cost + summary_cost
@@ -300,8 +294,7 @@ def supervisor_node(state: AgentState) -> dict:
     # ------------------------------------------------------------------
     if last_completed_node == "sourcing":
         if not candidate_pool:
-            client = wrap_anthropic(anthropic.Anthropic())
-            done = _finalize_run(client, state, cost_by_stage, daily_cost)
+            done = _finalize_run(state, cost_by_stage, daily_cost)
             return done
         company, remaining = _pop_next_company(candidate_pool)
         return {
@@ -326,8 +319,7 @@ def supervisor_node(state: AgentState) -> dict:
     # ------------------------------------------------------------------
     if last_completed_node == "scoring":
         # --- Opus per-company quality eval (always run) ---
-        client = wrap_anthropic(anthropic.Anthropic())
-        quality_result, quality_cost, q_in_tok, q_out_tok = _opus_quality_eval(client, state)
+        quality_result, quality_cost, q_in_tok, q_out_tok = _opus_quality_eval(state)
         cost_by_stage = add_cost(cost_by_stage, "supervisor", quality_cost)
         daily_cost += quality_cost
 
@@ -401,14 +393,14 @@ def supervisor_node(state: AgentState) -> dict:
 
         # Check cost cap before picking next
         if is_over_limit(daily_cost):
-            done = _finalize_run(client, state, cost_by_stage, daily_cost)
+            done = _finalize_run(state, cost_by_stage, daily_cost)
             return done
 
         # Pick next company or go to sourcing
         decision, company, remaining_pool = _pick_next_company_or_source(candidate_pool)
 
         if decision == "sourcing":
-            done = _finalize_run(client, state, cost_by_stage, daily_cost)
+            done = _finalize_run(state, cost_by_stage, daily_cost)
             return done
 
         base_update = {
@@ -463,11 +455,10 @@ def supervisor_node(state: AgentState) -> dict:
         # Check termination conditions
         if daily_goal_met or is_over_limit(daily_cost):
             # Update state before finalizing for accurate summary
-            client = wrap_anthropic(anthropic.Anthropic())
             state_copy = dict(state)
             state_copy["companies_ready"] = companies_ready
             state_copy["daily_goal_met"] = daily_goal_met
-            done = _finalize_run(client, state_copy, cost_by_stage, daily_cost)
+            done = _finalize_run(state_copy, cost_by_stage, daily_cost)
             done["companies_ready"] = companies_ready
             done["daily_goal_met"] = daily_goal_met
             return done

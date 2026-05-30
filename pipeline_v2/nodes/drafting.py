@@ -5,9 +5,8 @@ import time
 from pathlib import Path as _Path
 from typing import Any, Callable
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from pipeline_v2.lib.llm_client import call_llm
 
 from pipeline_v2.state import AgentState, DraftRecord
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost
@@ -180,7 +179,6 @@ def _validate_draft(mode: str, text: str) -> list[str]:
 
 
 def _sonnet_draft(
-    client: anthropic.Anthropic,
     mode: str,
     company: dict,
     knowledge_state: dict,
@@ -233,20 +231,19 @@ def _sonnet_draft(
     prompt = "".join(prompt_parts)
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_DRAFTING_MODEL,
-            max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=1024,
         )
 
-    response = _call_with_retry(_call)
-    cost = compute_cost(_DRAFTING_MODEL, response.usage.input_tokens, response.usage.output_tokens)
-    text = response.content[0].text.strip()
-    return text, cost, response.usage.input_tokens, response.usage.output_tokens
+    content, in_tok, out_tok = _call_with_retry(_call)
+    cost = compute_cost(_DRAFTING_MODEL, in_tok, out_tok)
+    text = content.strip()
+    return text, cost, in_tok, out_tok
 
 
 def _sonnet_founder_critique(
-    client: anthropic.Anthropic,
     mode: str,
     text: str,
     company_name: str,
@@ -268,17 +265,15 @@ def _sonnet_founder_critique(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_DRAFTING_MODEL,
-            max_tokens=512,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=512,
         )
 
-    response = _call_with_retry(_call)
-    cost = compute_cost(_DRAFTING_MODEL, response.usage.input_tokens, response.usage.output_tokens)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    cost = compute_cost(_DRAFTING_MODEL, in_tok, out_tok)
+    raw = _strip_fences(content)
     try:
         result = json.loads(raw)
     except json.JSONDecodeError:
@@ -296,7 +291,6 @@ def drafting_node(state: AgentState) -> dict:
     cost_by_stage = dict(state.get("cost_by_stage") or {})
     daily_cost = state.get("daily_cost") or 0.0
 
-    client = wrap_anthropic(anthropic.Anthropic())
     records: list[DraftRecord] = []
 
     for mode in _MESSAGE_MODES:
@@ -306,7 +300,6 @@ def drafting_node(state: AgentState) -> dict:
 
         while iteration < 3:
             text, cost, in_tok, out_tok = _sonnet_draft(
-                client,
                 mode,
                 current_company,
                 knowledge_state,
@@ -358,7 +351,7 @@ def drafting_node(state: AgentState) -> dict:
         if not failures:
             try:
                 critique_result, critique_cost, crit_in_tok, crit_out_tok = _sonnet_founder_critique(
-                    client, mode, text,
+                    mode, text,
                     current_company.get("name", ""),
                     current_company.get("founder", ""),
                     current_company.get("founder_role", "Founder"),

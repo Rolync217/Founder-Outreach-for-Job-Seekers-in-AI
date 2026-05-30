@@ -8,9 +8,8 @@ Workflow criteria loaded from skills/search_scope.yaml when available.
 import json
 import logging
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from litellm import completion as _litellm_completion
 
 from pipeline_v2.state import AgentState
 from pipeline_v2.lib.scoring_tool import compute_score, SCORING_TOOL_DEFINITION
@@ -23,6 +22,16 @@ from tools.config_loader import cfg
 logger = logging.getLogger(__name__)
 
 _SCORING_MODEL = cfg.models.scoring
+
+# Convert Anthropic tool format → OpenAI format for LiteLLM
+_SCORING_TOOL_OPENAI = [{
+    "type": "function",
+    "function": {
+        "name": SCORING_TOOL_DEFINITION["name"],
+        "description": SCORING_TOOL_DEFINITION["description"],
+        "parameters": SCORING_TOOL_DEFINITION["input_schema"],
+    },
+}]
 
 
 def _build_scoring_prompt(state: dict, scoring_cfg: dict) -> str:
@@ -78,7 +87,6 @@ def _call_scoring_agent(state: dict) -> dict:
     6 reasoning strings, total_score, and tier.
     """
     scoring_cfg = get_scoring_config()
-    client = wrap_anthropic(anthropic.Anthropic())
     prompt = _build_scoring_prompt(state, scoring_cfg)
 
     messages = [{"role": "user", "content": prompt}]
@@ -89,38 +97,45 @@ def _call_scoring_agent(state: dict) -> dict:
     total_out_tok: int = 0
 
     for _ in range(3):
-        resp = client.messages.create(
+        resp = _litellm_completion(
             model=_SCORING_MODEL,
             max_tokens=1024,
-            tools=[SCORING_TOOL_DEFINITION],
+            tools=_SCORING_TOOL_OPENAI,
             messages=messages,
         )
-        total_in_tok += resp.usage.input_tokens
-        total_out_tok += resp.usage.output_tokens
-        messages.append({"role": "assistant", "content": resp.content})
+        total_in_tok += resp.usage.prompt_tokens if resp.usage else 0
+        total_out_tok += resp.usage.completion_tokens if resp.usage else 0
 
-        tool_use_block = next(
-            (b for b in resp.content if getattr(b, "type", None) == "tool_use"),
-            None,
-        )
+        assistant_msg = resp.choices[0].message
+        tool_calls = getattr(assistant_msg, "tool_calls", None) or []
+        history_entry: dict = {"role": "assistant", "content": assistant_msg.content or ""}
+        if tool_calls:
+            history_entry["tool_calls"] = [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                }
+                for tc in tool_calls
+            ]
+        messages.append(history_entry)
 
-        if tool_use_block:
-            tool_input = tool_use_block.input
+        tool_call = tool_calls[0] if tool_calls else None
+
+        if tool_call:
+            tool_input = json.loads(tool_call.function.arguments)
             tool_result = compute_score(**tool_input)
             scores = {**tool_input, **tool_result}
 
             messages.append({
-                "role": "user",
-                "content": [{
-                    "type": "tool_result",
-                    "tool_use_id": tool_use_block.id,
-                    "content": json.dumps(tool_result),
-                }],
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(tool_result),
             })
             continue
 
-        if resp.content:
-            text = getattr(resp.content[0], "text", "")
+        if assistant_msg.content:
+            text = assistant_msg.content
             for dim in ("hiring", "founder", "product", "traction", "recency", "alignment"):
                 for line in text.split("\n"):
                     line_lower = line.lower()

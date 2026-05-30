@@ -16,9 +16,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from pipeline_v2.lib.llm_client import call_llm
 
 from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost, is_over_limit
@@ -255,7 +254,6 @@ _KICKOFF_FALLBACK = {
 
 
 def _sonnet_kickoff(
-    client: anthropic.Anthropic,
     company: dict,
     sources_detail: str,
     iterations: int = 0,
@@ -334,16 +332,14 @@ def _sonnet_kickoff(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_RESEARCH_MODEL,
-            max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         result = json.loads(raw)
@@ -362,7 +358,6 @@ def _sonnet_kickoff(
 # ---------------------------------------------------------------------------
 
 def _sonnet_iteration(
-    client: anthropic.Anthropic,
     company: dict,
     knowledge_state: dict,
     source_name: str,
@@ -478,16 +473,14 @@ def _sonnet_iteration(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_RESEARCH_MODEL,
-            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         result = json.loads(raw)
@@ -531,7 +524,6 @@ def _sonnet_iteration(
 # ---------------------------------------------------------------------------
 
 def _opus_checkpoint(
-    client: anthropic.Anthropic,
     company: dict,
     search_history: list[dict],
     knowledge_state: dict,
@@ -629,16 +621,14 @@ def _opus_checkpoint(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_SYNTHESIS_MODEL,
-            max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         result = json.loads(raw)
@@ -712,9 +702,6 @@ def research_node(state: AgentState) -> dict:
     no_progress_thresh = get_no_progress_threshold(run_type)
     checkpoint_interval = get_opus_checkpoint_interval(run_type)
 
-    sonnet_client = wrap_anthropic(anthropic.Anthropic())
-    opus_client = wrap_anthropic(anthropic.Anthropic())
-
     # ── Phase 0: Kickoff ──────────────────────────────────────────────────
     if is_over_limit(daily_cost):
         logger.warning("Daily cost cap reached before research kickoff ($%.4f) — skipping %s",
@@ -732,7 +719,7 @@ def research_node(state: AgentState) -> dict:
 
     sources_detail = _build_research_sources_detail(all_sources, fetched_sources_set, run_type, light_categories)
     kickoff_result, in_tok, out_tok = _sonnet_kickoff(
-        sonnet_client, current_company, sources_detail,
+        current_company, sources_detail,
         iterations=0,
         max_iter=max_iter,
         consecutive_fetch_failures=0,
@@ -880,7 +867,7 @@ def research_node(state: AgentState) -> dict:
         # Sonnet iteration evaluation
         opus_redirect_for_prompt = current_redirect if redirect_just_completed else None
         iter_result, in_tok, out_tok = _sonnet_iteration(
-            sonnet_client, current_company, knowledge_state,
+            current_company, knowledge_state,
             source_name, search_query, fetch_result["content"],
             search_history, sources_detail, opus_redirect=opus_redirect_for_prompt,
             iterations=iterations,
@@ -985,7 +972,7 @@ def research_node(state: AgentState) -> dict:
         trigger_checkpoint = (sonnet_iters_since_checkpoint >= checkpoint_interval) or stuck_signal
         if trigger_checkpoint:
             checkpoint_result, in_tok, out_tok = _opus_checkpoint(
-                opus_client, current_company, search_history, knowledge_state,
+                current_company, search_history, knowledge_state,
                 iterations + 1, "stuck" if stuck_signal else "interval",
             )
             cost = compute_cost(_SYNTHESIS_MODEL, in_tok, out_tok)

@@ -42,15 +42,20 @@ user_profile:
     - Remote-US
   cta: "Would love a 15-min chat"
 
+# Model strings follow LiteLLM's prefix format — change the prefix to switch providers:
+#   openrouter/anthropic/claude-sonnet-4-6  → via OpenRouter (default)
+#   anthropic/claude-sonnet-4-6             → Anthropic direct (set ANTHROPIC_API_KEY)
+#   moonshot/moonshot-v1-8k                 → Moonshot direct (set MOONSHOT_API_KEY)
+#   openai/gpt-4o                           → OpenAI direct (set OPENAI_API_KEY)
 models:
-  filter: "deepseek/deepseek-chat"          # sourcing node — entity extraction (cheap/fast)
-  sourcing: "anthropic/claude-sonnet-4-6"   # sourcing node — company planning
-  research: "deepseek/deepseek-r1"          # research node — deep research
-  research_synthesis: "anthropic/claude-opus-4-6"  # research node — final synthesis
-  scoring: "anthropic/claude-sonnet-4-6"    # scoring node
-  leverage: "anthropic/claude-opus-4-6"     # leverage node
-  drafting: "anthropic/claude-sonnet-4-6"   # drafting node
-  supervisor: "anthropic/claude-opus-4-6"   # supervisor node
+  filter: "openrouter/deepseek/deepseek-chat"              # sourcing node — entity extraction (cheap/fast)
+  sourcing: "openrouter/anthropic/claude-sonnet-4-6"       # sourcing node — company planning
+  research: "openrouter/deepseek/deepseek-r1"              # research node — deep research
+  research_synthesis: "openrouter/anthropic/claude-opus-4-6"   # research node — final synthesis
+  scoring: "openrouter/anthropic/claude-sonnet-4-6"        # scoring node
+  leverage: "openrouter/anthropic/claude-opus-4-6"         # leverage node
+  drafting: "openrouter/anthropic/claude-sonnet-4-6"       # drafting node
+  supervisor: "openrouter/anthropic/claude-opus-4-6"       # supervisor node
 
 outreach:
   tone: "curious and collaborative, founder-to-founder"

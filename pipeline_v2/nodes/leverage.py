@@ -4,9 +4,8 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-import anthropic
 from langsmith import traceable
-from langsmith.wrappers import wrap_anthropic
+from pipeline_v2.lib.llm_client import call_llm
 
 from pipeline_v2.state import AgentState
 from pipeline_v2.lib.cost_tracker import compute_cost, add_cost
@@ -77,7 +76,6 @@ def _is_founder_data_insufficient(state: AgentState) -> bool:
 
 
 def _opus_leverage_explore(
-    client: anthropic.Anthropic,
     company: dict,
     knowledge_state: dict,
     hiring_signals: list,
@@ -107,16 +105,14 @@ def _opus_leverage_explore(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_LEVERAGE_MODEL,
-            max_tokens=4096,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         parsed = json.loads(raw)
@@ -131,7 +127,6 @@ def _opus_leverage_explore(
 
 
 def _opus_leverage_select(
-    client: anthropic.Anthropic,
     company: dict,
     knowledge_state: dict,
     hiring_signals: list,
@@ -164,16 +159,14 @@ def _opus_leverage_select(
     )
 
     def _call():
-        return client.messages.create(
+        return call_llm(
             model=_LEVERAGE_MODEL,
-            max_tokens=2048,
             messages=[{"role": "user", "content": prompt}],
+            max_tokens=2048,
         )
 
-    response = _call_with_retry(_call)
-    in_tok = response.usage.input_tokens
-    out_tok = response.usage.output_tokens
-    raw = _strip_fences(response.content[0].text)
+    content, in_tok, out_tok = _call_with_retry(_call)
+    raw = _strip_fences(content)
 
     try:
         parsed = json.loads(raw)
@@ -211,10 +204,8 @@ def leverage_node(state: AgentState) -> dict:
 
     knowledge_state = state.get("knowledge_state") or {}
     hiring_signals = state.get("hiring_signals_found") or []
-    client = wrap_anthropic(anthropic.Anthropic())
-
     # Call 1: explore angles
-    angles, in_tok_1, out_tok_1 = _opus_leverage_explore(client, current_company, knowledge_state, hiring_signals)
+    angles, in_tok_1, out_tok_1 = _opus_leverage_explore(current_company, knowledge_state, hiring_signals)
     cost_1 = compute_cost(_LEVERAGE_MODEL, in_tok_1, out_tok_1)
     persist_cost_log(
         run_id=state.get("run_id", ""),
@@ -240,7 +231,7 @@ def leverage_node(state: AgentState) -> dict:
 
     # Call 2: select strongest angle
     select_result, in_tok_2, out_tok_2 = _opus_leverage_select(
-        client, current_company, knowledge_state, hiring_signals, angles
+        current_company, knowledge_state, hiring_signals, angles
     )
     cost_2 = compute_cost(_LEVERAGE_MODEL, in_tok_2, out_tok_2)
     persist_cost_log(
