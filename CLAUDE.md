@@ -6,7 +6,24 @@ This is a research and drafting pipeline for founder outreach. It finds early-st
 
 ## Upgrading an existing installation
 
-If you already have a `config.yaml`, check your `models:` block. The latest version requires 8 keys (see `config.example.yaml`). Missing keys crash the pipeline at startup with an `AttributeError` that tells you which key is absent. Either re-copy `config.example.yaml` (then re-fill `user_profile`) or add the missing keys manually.
+### Upgrading from the OpenRouter SDK-hack setup (pre-LiteLLM, before June 2026)
+
+If the user's `.env` has `ANTHROPIC_BASE_URL=https://openrouter.ai/api/v1`, they're on the old setup. The pipeline now uses LiteLLM — model strings and the env var have changed.
+
+Tell the user to:
+
+1. **Update `.env`:** Remove `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`. Add `OPENROUTER_API_KEY=sk-or-v1-...` instead. Their existing OpenRouter key will work — it's the same key they were using before, just under the correct env var name.
+
+2. **Update `config.yaml` model strings:** All model strings now need a provider prefix. Add `openrouter/` in front of every model entry:
+   - `deepseek/deepseek-chat` → `openrouter/deepseek/deepseek-chat`
+   - `anthropic/claude-sonnet-4-6` → `openrouter/anthropic/claude-sonnet-4-6`
+   - Apply to all 8 keys. Or re-copy: `cp config.example.yaml config.yaml` then re-fill `user_profile`.
+
+3. **Install LiteLLM:** `pip install -r requirements.txt` (or rebuild Docker image).
+
+### Upgrading from before May 2026 (missing model keys)
+
+If the user already has a `config.yaml`, check their `models:` block. The latest version requires 8 keys (see `config.example.yaml`). Missing keys crash the pipeline at startup with an `AttributeError` that tells you which key is absent. Either re-copy `config.example.yaml` (then re-fill `user_profile`) or add the missing keys manually using the `openrouter/` prefix format.
 
 ---
 
@@ -34,9 +51,17 @@ Fill in the `user_profile` block with the user's answers from Step 1. Leave `pip
 
 Before asking for `DATABASE_URL`: confirm the user already has a running Postgres instance. If they don't, suggest one of these (all have free tiers): Supabase (supabase.com), Neon (neon.tech), or Railway (railway.app). A local install also works: `brew install postgresql && brew services start postgresql`. Do not proceed past this step until they have a connection string.
 
-Tell the user you need four keys. Ask for them one at a time and tell them where to get each:
+First ask: **"Which LLM provider do you want to use?"**
 
-- `ANTHROPIC_API_KEY` — console.anthropic.com
+Options:
+- **OpenRouter** (recommended — one key, 200+ models, easiest setup): ask for `OPENROUTER_API_KEY` from openrouter.ai/keys. The default model strings in `config.yaml` already use `openrouter/` prefix — no changes needed.
+- **Anthropic direct**: ask for `ANTHROPIC_API_KEY` from console.anthropic.com. Update all 8 model strings in `config.yaml` to remove the `openrouter/` prefix (e.g. `openrouter/anthropic/claude-sonnet-4-6` → `anthropic/claude-sonnet-4-6`).
+- **Moonshot / Kimi direct**: ask for `MOONSHOT_API_KEY` from platform.moonshot.cn. Update model strings in `config.yaml` to `moonshot/moonshot-v1-8k` (or whichever Moonshot model they want).
+- **OpenAI direct**: ask for `OPENAI_API_KEY` from platform.openai.com. Update model strings in `config.yaml` to `openai/gpt-4o` or similar.
+
+Then ask for these keys one at a time:
+
+- The provider API key they chose above
 - `FIRECRAWL_API_KEY` — firecrawl.dev
 - `LINKDAPI_KEY` — linkdapi.com
 - `DATABASE_URL` — a Postgres connection string: `postgresql://user:pass@host:5432/dbname`
