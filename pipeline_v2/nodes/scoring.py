@@ -9,8 +9,8 @@ import json
 import logging
 
 from langsmith import traceable
-from litellm import completion as _litellm_completion
 
+from pipeline_v2.lib.llm_client import call_llm_with_tools
 from pipeline_v2.state import AgentState
 from pipeline_v2.lib.scoring_tool import compute_score, SCORING_TOOL_DEFINITION
 from pipeline_v2.lib.scope_loader import get_scoring_config
@@ -97,11 +97,10 @@ def _call_scoring_agent(state: dict) -> dict:
     total_out_tok: int = 0
 
     for _ in range(3):
-        resp = _litellm_completion(
+        resp = call_llm_with_tools(
             model=_SCORING_MODEL,
-            max_tokens=1024,
-            tools=_SCORING_TOOL_OPENAI,
             messages=messages,
+            tools=_SCORING_TOOL_OPENAI,
         )
         total_in_tok += resp.usage.prompt_tokens if resp.usage else 0
         total_out_tok += resp.usage.completion_tokens if resp.usage else 0
