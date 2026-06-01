@@ -4,8 +4,8 @@ A research and drafting pipeline for founder outreach. It finds early-stage AI c
 
 ## What it does
 
-1. **Sourcing** — finds AI startups via YC Algolia, LinkedIn posts, and funding news
-2. **Research** — scrapes each company's website, jobs page, and LinkedIn using Firecrawl
+1. **Sourcing** — finds AI startups via web search across startup directories, LinkedIn posts, and funding news
+2. **Research** — scrapes each company's website, jobs page, Crunchbase, and founder's LinkedIn using Firecrawl; captures product, traction, hiring signals, and founder background
 3. **Scoring** — rates fit across six dimensions: hiring intent, founder background, product, traction, recency, alignment
 4. **Leverage** — matches your background to what the company is actually building
 5. **Drafting** — writes a LinkedIn invite, DM, or longer reference message
@@ -32,7 +32,7 @@ Drafted messages are stored in Postgres. Sending is not yet implemented — `dry
 
 ## Quickest start
 
-**One prerequisite:** you need a running Postgres database. The pipeline stores everything there and the agent cannot provision one for you. Any of these work:
+**One prerequisite:** you need a running Postgres database. The pipeline stores everything there and the agent cannot provision one for you. Claude Code can help you set one up if you ask it. Any of these work:
 - Local: `brew install postgresql && brew services start postgresql`
 - Hosted (free tier): [Supabase](https://supabase.com), [Neon](https://neon.tech), [Railway](https://railway.app)
 
