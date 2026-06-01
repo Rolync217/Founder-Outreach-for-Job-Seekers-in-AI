@@ -21,6 +21,10 @@ Do not draft for any other seniority level or function.
 ## Workflow
 
 ### When Drafting
+If `references/voice-profile.md` exists, load it. Use it to adapt sentence rhythm,
+phrasing patterns, and observation style to match the user's voice while keeping
+all structural rules and validation checks intact.
+
 1. Identify the message format: `linkedin_invite`, `linkedin_dm`, or `long_reference`
 2. Load `references/rules.md` — structure, tone rules, hard constraints, and role-based framing
 3. Load `references/tone-templates.md` — format-specific and role-specific templates

@@ -43,6 +43,15 @@ def _load_outreach_rules() -> str:
         parts.append(style_path.read_text())
     except OSError:
         pass  # optional — not required
+    if cfg.get("outreach", {}).get("tone_matching", False):
+        voice_path = base / "references" / "voice-profile.md"
+        try:
+            parts.append(voice_path.read_text())
+        except OSError:
+            logger.warning(
+                "tone_matching is enabled but voice-profile.md not found — "
+                "run tools/calibrate_voice.py"
+            )
     return "\n\n---\n\n".join(parts) if parts else ""
 
 

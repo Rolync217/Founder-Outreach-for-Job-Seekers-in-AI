@@ -59,6 +59,7 @@ cp .env.example .env                 # fill in API keys
 pip install -r requirements.txt
 playwright install chromium
 python tools/migrate.py
+python tools/calibrate_voice.py  # optional: generates a personal voice profile for the drafting node from your LinkedIn posts. Requires LINKDAPI_KEY.
 ```
 
 ---

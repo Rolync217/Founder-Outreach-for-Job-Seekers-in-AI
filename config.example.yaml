@@ -56,6 +56,7 @@ models:
   leverage: "openrouter/anthropic/claude-opus-4-6"         # leverage node
   drafting: "openrouter/anthropic/claude-sonnet-4-6"       # drafting node
   supervisor: "openrouter/anthropic/claude-opus-4-6"       # supervisor node
+  utility: "openrouter/anthropic/claude-sonnet-4-6"        # general-purpose model for utility scripts, one-off analysis, and calibration tasks
 
 outreach:
   tone: "curious and collaborative, founder-to-founder"
@@ -69,6 +70,7 @@ outreach:
   channel_priority:
     - linkedin
     - email
+  tone_matching: false   # set true (or run calibrate_voice.py) to inject personal voice from skills/outreach-rules/references/voice-profile.md
 
 sources:
   yc:

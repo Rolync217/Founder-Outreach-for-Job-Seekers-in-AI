@@ -75,6 +75,16 @@ cp .env.example .env
 
 Write the collected keys into `.env`.
 
+### Step 3b — Voice calibration (optional)
+
+```bash
+python tools/calibrate_voice.py
+```
+
+Fetches your recent LinkedIn posts via LinkdAPI and generates a personal voice profile
+for the drafting node. Requires LINKDAPI_KEY to be set. Skippable — the pipeline works
+without it, drafts will just follow the base tone rules.
+
 ### Step 4 — Candidate leverage profile
 
 Edit `skills/candidate-leverage/SKILL.md`. Ask the user for:
