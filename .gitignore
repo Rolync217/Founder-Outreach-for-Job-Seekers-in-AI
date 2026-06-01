@@ -26,6 +26,7 @@ reports/
 # Local reference docs (not for repo)
 linkdAPI.md
 linkedin_posts.md
+bugs_and_ fixes.md
 
 # macOS
 .DS_Store
@@ -39,3 +40,12 @@ linkedin_posts.md
 # IDE
 .vscode/
 .idea/
+
+# Local docs (not for repo)
+BUGS_AND_FIXES.md
+PIPELINE_EXPLAINED.md
+OPENROUTER_PLAN.md
+firecrawl.md
+SKILL_DISTRIBUTION_REPORT.md
+docs/rolync-skill-distribution-plan.md
+docs/superpowers/
