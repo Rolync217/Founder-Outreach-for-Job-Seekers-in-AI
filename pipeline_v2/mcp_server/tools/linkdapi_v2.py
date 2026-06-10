@@ -8,7 +8,7 @@ Public functions:
     get_hiring_signals(founder_linkedin_url, company_linkedin_id, lookback_days, company_name) -> HiringSignalResult
 
 Add LINKDAPI_KEY to .env before use.
-Optional: LINKDAPI_BASE_URL (default: https://api.linkdapi.com/v1 — verify on first real call).
+Optional: LINKDAPI_BASE_URL (default: https://linkdapi.com/api/v1).
 """
 
 import json
@@ -23,7 +23,7 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-_BASE_URL = os.getenv("LINKDAPI_BASE_URL", "https://api.linkdapi.com/v1")
+_BASE_URL = os.getenv("LINKDAPI_BASE_URL", "https://linkdapi.com/api/v1")
 
 _DIRECT_PATTERNS = re.compile(
     r"we'?re hiring|we are hiring|join our team|join us\b|"
@@ -65,7 +65,7 @@ def _headers() -> dict:
     key = os.getenv("LINKDAPI_KEY")
     if not key:
         raise RuntimeError("LINKDAPI_KEY not set in environment")
-    return {"X-AUTHAPI-Key": key}
+    return {"X-linkdapi-apikey": key}
 
 
 def _get(path: str, params: Optional[dict] = None, retries: int = 3) -> dict:
@@ -99,7 +99,7 @@ def _username_from_url(url: str) -> Optional[str]:
 
 def _urn_from_username(username: str) -> tuple[Optional[str], int]:
     try:
-        data = _get("username-to-urn", {"username": username})
+        data = _get("profile/username-to-urn", {"username": username})
         urn = data.get("data", {}).get("urn") or data.get("urn")
         return urn, 1
     except Exception as exc:
@@ -306,8 +306,14 @@ def resolve_company_linkedin(
     if existing_id:
         return existing_id
     try:
-        data = _get("companies/name-lookup", {"name": company_name})
-        company_id = data.get("data", {}).get("id") or data.get("id")
+        data = _get("companies/name-lookup", {"query": company_name})
+        inner = data.get("data", {})
+        companies = inner.get("companies", [])
+        company_id = (
+            (companies[0].get("id") if companies else None)
+            or inner.get("id")
+            or data.get("id")
+        )
         return str(company_id) if company_id else None
     except Exception as exc:
         logger.warning("resolve_company_linkedin failed for %s: %s", company_name, exc)
