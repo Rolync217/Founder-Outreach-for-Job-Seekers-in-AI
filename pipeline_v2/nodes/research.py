@@ -76,7 +76,7 @@ def _first_n_sentences(text: str, n: int) -> str:
 
 _EXECUTION_TOOLS_SECTION = (
     "EXECUTION TOOLS\n\n"
-    "web_search (Tavily):\n"
+    "web_search (Firecrawl):\n"
     "  Used for ALL sources except yc_directory.\n"
     "  Searches the public web using your query string. Returns top 10 results.\n"
     "  The source name does NOT change what gets searched — your query determines\n"
@@ -218,9 +218,9 @@ def _should_early_exit(knowledge_state: dict, hiring_signals: list[dict]) -> boo
 # Fetch
 # ---------------------------------------------------------------------------
 
-@traceable(run_type="tool", name="Tavily Research Search")
+@traceable(run_type="tool", name="Firecrawl Research Search")
 def _fetch_source_with_query(source: dict, company: dict, search_query: str) -> dict:
-    """Fetch via Tavily using model-generated query.
+    """Fetch via Firecrawl using model-generated query.
 
     Returns: {success: bool, content: str, url: str, error: str}
     """
@@ -287,7 +287,7 @@ def _sonnet_kickoff(
     flag_instruction = (
         "- If fit_flags are present above, your first fetch should target resolving the most\n"
         "  critical flag. Examples: if 'unclear if agent or wrapper' — fetch company_website\n"
-        "  to assess product type first. If 'may be post-Series A' — fetch crunchbase_via_tavily.\n"
+        "  to assess product type first. If 'may be post-Series A' — fetch crunchbase_via_firecrawl.\n"
         "  If 'domain: crypto/blockchain' — fetch company_website to confirm or rule out.\n"
     ) if fit_flags else ""
 
@@ -809,7 +809,7 @@ def research_node(state: AgentState) -> dict:
             break
 
         # yc_directory has no per-company scraper in research — fall back to a
-        # targeted Tavily lookup so the LLM gets real data instead of an empty query error.
+        # targeted Firecrawl web_search so the LLM gets real data instead of an empty query error.
         if source_name == "yc_directory":
             company_name = current_company.get("name", "")
             search_query = f'"{company_name}" site:ycombinator.com'

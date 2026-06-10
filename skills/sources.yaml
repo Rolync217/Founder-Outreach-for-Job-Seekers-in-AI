@@ -68,7 +68,7 @@ global:
       - web_search_general         # last resort
 
     company_stage_and_size:
-      - crunchbase_via_tavily      # primary, structured, high trust
+      - crunchbase_via_firecrawl      # primary, structured, high trust
       - funding_news               # strong for recent rounds
       - yc_directory               # partial, batch and team size
       - vc_portfolio_pages         # confirms VC backing
@@ -473,7 +473,7 @@ sources:
     when_to_use: >
       Highest priority source for hiring_signal. A founder
       personally posting they are hiring is always Tier 1
-      regardless of any other signal. Search via Tavily for
+      regardless of any other signal. Search via Firecrawl for
       recent LinkedIn or Twitter posts from founders or CTOs
       mentioning hiring. Also provides partial founder_background
       since the post reveals the poster's role and sometimes
@@ -538,7 +538,7 @@ sources:
       may have filled the role and not removed the listing.
     when_to_use: >
       Use when careers_page returned nothing or does not exist.
-      Search Greenhouse, Lever, and Ashby boards via Tavily
+      Search Greenhouse, Lever, and Ashby boards via Firecrawl
       using the company name. If a matching ATS board is found
       with relevant roles, this is strong Tier 1 or Tier 2
       hiring evidence. Prefer this over linkedin_jobs because
@@ -748,7 +748,7 @@ sources:
       Older posts should be ignored.
     when_to_use: >
       Use to detect early hiring signals before companies
-      post on formal ATS boards. Search via Tavily for
+      post on formal ATS boards. Search via Firecrawl for
       hiring posts on CoffeeSpace, Slack communities
       (Elpha, Rands Leadership, MLOps Community, AI
       Engineers), Discord servers, and Hacker News
@@ -924,7 +924,7 @@ sources:
       - company_website
       - founder_linkedin_profile
     fallback_on_failure:
-      - crunchbase_via_tavily
+      - crunchbase_via_firecrawl
       - web_search_general
     recency_rule: >
       Portfolio pages are static. Assume recent (90 day)
@@ -932,7 +932,7 @@ sources:
       with company_website to confirm still active.
     when_to_use: >
       Use during sourcing in deep_run to discover companies
-      backed by specific VCs. Search via Tavily for portfolio
+      backed by specific VCs. Search via Firecrawl for portfolio
       pages from a16z(https://speedrun.a16z.com/companies), Sequoia, Greylock, First Round,
       Lightspeed, Accel, and other early-stage VCs. Provides
       partial company_stage_and_size.
@@ -980,7 +980,7 @@ sources:
       good discovery signals.
     when_to_use: >
       Use during sourcing in deep_run to discover companies
-      from accelerators beyond YC. Search via Tavily for
+      from accelerators beyond YC. Search via Firecrawl for
       Techstars, 500 Global, South Park Commons,
       Entrepreneur First, Neo, On Deck, and other
       AI-focused accelerators. Provides partial
@@ -1028,7 +1028,7 @@ sources:
     enrichment_needed_from:
       - company_website
     fallback_on_failure:
-      - crunchbase_via_tavily
+      - crunchbase_via_firecrawl
       - web_search_general
     recency_rule: >
       Funding news within fresh (30 days) is strong for
@@ -1144,7 +1144,7 @@ sources:
       the company, treat as contradictory evidence.
     when_to_use: >
       Use when founder_background is unknown or partial and
-      you have at least one founder name. Search via Tavily.
+      you have at least one founder name. Search via Firecrawl.
       Primary source for founder_background — can reach
       sufficient on its own. Essential for leverage matching.
     when_not_to_use: >
@@ -1155,7 +1155,7 @@ sources:
     common_failure_modes:
       - wrong_person_with_similar_name   # maps to: malformed_entity
       - minimal_public_profile            # low signal — partial acceptable
-      - tavily_returns_company_not_person  # technical — refine query
+      - firecrawl_returns_company_not_person  # technical — refine query
     extract_fields:
       - founder_name
       - current_role
@@ -1165,7 +1165,7 @@ sources:
       - years_of_experience
       - source_url
 
-  - source_name: crunchbase_via_tavily
+  - source_name: crunchbase_via_firecrawl
     source_category: validation
     enabled: true
     purpose:
@@ -1193,14 +1193,14 @@ sources:
       funding_news.
     when_to_use: >
       Use when company_stage_and_size is unknown or partial.
-      Search Tavily with "site:crunchbase.com [company name]".
+      Search Firecrawl with "site:crunchbase.com [company name]".
       Can reach sufficient on its own.
     when_not_to_use: >
       Do not use for product_understanding or work_alignment.
       Do not use for hiring_signal. If funding_news already
       provided sufficient data, skip to save cost.
     common_failure_modes:
-      - tavily_returns_search_page_not_profile  # technical — refine query
+      - firecrawl_returns_search_page_not_profile  # technical — refine query
       - outdated_crunchbase_profile              # maps to: stale_entity
       - company_not_on_crunchbase                # empty result, not rejection
     extract_fields:
@@ -1288,7 +1288,7 @@ sources:
       Use only when no structured source returned useful
       results for the current knowledge gap. This is the
       last resort before marking a dimension as
-      insufficient_data. Search Tavily with a targeted
+      insufficient_data. Search Firecrawl with a targeted
       query like "[company name] [dimension keyword]".
       Results are unstructured and low trust by default —
       but results from authoritative_domains may be

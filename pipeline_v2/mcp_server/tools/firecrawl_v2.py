@@ -2,8 +2,7 @@
 
 Firecrawl Python SDK tool wrappers for the pipeline v2 MCP server.
 All functions load FIRECRAWL_API_KEY from the environment.
-These are the primary web tools for the agent — replaces Tavily and
-the old httpx scraper.
+These are the primary web tools for the agent.
 
 Tools:
   search_web             — search the web, return snippets

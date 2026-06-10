@@ -447,7 +447,7 @@ def _haiku_extract_entities(
     source: dict,
     results: list[dict],
 ) -> tuple[list[dict], float, int, int]:
-    """Use Haiku to extract company entities from raw Tavily results with confidence scoring.
+    """Use Haiku to extract company entities from raw Firecrawl search results with confidence scoring.
 
     Returns (entities, cost_usd, input_tokens, output_tokens).
     Each entity: {name, url, description, source_name, pool_origin,
