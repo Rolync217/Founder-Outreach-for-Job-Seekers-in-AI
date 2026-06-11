@@ -50,3 +50,7 @@ SKILL_DISTRIBUTION_REPORT.md
 docs/rolync-skill-distribution-plan.md
 docs/superpowers/
 linkedin_comments.md
+post-skill-diff.md
+
+# Firecrawl local cache
+.firecrawl/
